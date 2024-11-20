@@ -54,10 +54,10 @@ we want to see one Lua file which can be distributed independently.
 
 ## How it works?
 
-Melder is a file scanner. It gets all `*.lua` files from current dir,
-converts their file name to module name and loads its text (source code).
+Melder generates Lua source code and prints it to stdout.
 
-It generates Lua source code file and prints it to stdout.
+It is a file scanner. It gets all `*.lua` files from current dir,
+converts their file names to module names and loads their text (source code).
 
 It writes them to table
 ```Lua
@@ -66,7 +66,7 @@ local Modules = {
 }
 ```
 
-Then it compiles their code but do not run it. Compiled code is
+Then it compiles their code but not runs it. Compiled code is
 stored in `_G.package.preload` table (see Lua documentation).
 Hat tip from me to Lua authors for this nice design.
 
@@ -91,7 +91,7 @@ And finally it adds activation line, which is a mere `require(<module_name>)`.
 `<module_name>` is that additional command-line argument: `test` or `meld`
 in our examples.
 
-If there are no command-line argument, activation line is `require(arg [1])`.
+If there is no command-line argument, activation line is `require(arg[1])`.
 Yep. Call any module from library from command-line.
 
 Sapienti sat.
