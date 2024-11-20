@@ -5,7 +5,7 @@ local Modules = {
 --[[
   Author: Martin Eden
   License: LGPL v3
-  Last mod.: 2024-11-20
+  Last mod.: 2024-11-21
 ]]
 
 require('workshop.base')
@@ -28,7 +28,7 @@ local LooksLikeModule =
 
 local GetModuleName =
   function(PathName)
-    ParsedName = ParsePathName(PathName)
+    local ParsedName = ParsePathName(PathName)
     local DirName = ParsedName.directory
     local FileName = ParsedName.name
     assert(not ParsedName.is_directory)
