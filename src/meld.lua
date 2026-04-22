@@ -3,10 +3,16 @@
 --[[
   Author: Martin Eden
   License: LGPL v3
-  Last mod.: 2024-11-21
+  Last mod.: 2026-04-22
 ]]
 
+--[[ Release
 require('workshop.base')
+--]]
+-- [[ Develop
+package.path = package.path .. ';../../../?.lua'
+require('workshop.base')
+--]]
 
 local FileLister = request('!.mechs.file_lister.interface')
 local TableToCodeStr = request('!.table.as_string')
@@ -84,7 +90,7 @@ local AddModulesTablePrefix =
     local FirstLine = Lines:GetFirstLine()
     assert(FirstLine:sub(1, 1) == '{')
     FirstLine = 'local Modules = ' .. FirstLine
-    Lines:RemoveLineAt(1)
+    Lines:RemoveFirstLine()
     Lines:AddFirstLine(FirstLine)
   end
 
@@ -128,4 +134,5 @@ io.write(Lines:ToString())
 
 --[[
   2024-11-20
+  2026-04-22
 ]]
