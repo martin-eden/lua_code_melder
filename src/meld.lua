@@ -14,7 +14,7 @@ package.path = package.path .. ';../../../?.lua'
 require('workshop.base')
 --]]
 
-local FileLister = request('!.mechs.file_lister.interface')
+local FilesLister = request('!.concepts.FilesLister.Interface')
 local TableToCodeStr = request('!.table.as_string')
 local FileAsString = request('!.file_system.file.as_string')
 local Lines = request('!.concepts.Lines.Interface')
@@ -55,29 +55,28 @@ local GetModuleName =
 local PopulateModules
 PopulateModules =
   function(DirName, Result)
-    FileLister.start_dir = DirName
-    FileLister:init()
-    local Directories = FileLister:get_directories_list()
-    local Files = FileLister:get_files_list()
+    FilesLister:SetBaseDirectory(DirName)
 
-    for Index, FileName in ipairs(Files) do
+    local Files = FilesLister:GetFiles()
+    for _, FileName in ipairs(Files) do
       if LooksLikeModule(FileName) then
-        local FullFileName = DirName .. '/' .. FileName
+        local FullFileName = DirName .. FileName
         local ModuleCode = FileAsString(FullFileName)
         local ModuleName = GetModuleName(FullFileName)
         Result[ModuleName] = ModuleCode
       end
     end
 
-    for Index, Directory in ipairs(Directories) do
-      PopulateModules(DirName .. '/' .. Directory, Result)
+    local Directories = FilesLister:GetDirectories()
+    for _, Directory in ipairs(Directories) do
+      PopulateModules(DirName .. Directory, Result)
     end
   end
 
 local GetModules =
   function()
     local Result = {}
-    PopulateModules('.', Result)
+    PopulateModules('./', Result)
     return Result
   end
 
@@ -88,7 +87,7 @@ Lines:FromString(ModulesTableStr)
 local AddModulesTablePrefix =
   function(Lines)
     local FirstLine = Lines:GetFirstLine()
-    assert(FirstLine:sub(1, 1) == '{')
+    assert(FirstLine == '{')
     FirstLine = 'local Modules = ' .. FirstLine
     Lines:RemoveFirstLine()
     Lines:AddFirstLine(FirstLine)
