@@ -13,25 +13,6 @@ package.path = package.path .. ';../../?.lua'
 require('workshop.base')
 --]]
 
---[[
-  To do
-
-    * Unmeld
-
-      Unmeld works with file, Meld works with directory
-
-  Done
-
-    * Become happy with used [workshop] code
-
-    * snake_case by default
-
-      CamelCase for tables and their fields
-
-    * Ability to run from another directory
-
-]]
-
 local Config =
   {
     ModulesDir = arg[1],
