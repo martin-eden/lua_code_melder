@@ -5,10 +5,10 @@
   Last mod.: 2026-04-23
 ]]
 
---[[ Release
+-- [[ Release
 require('workshop.base')
 --]]
--- [[ Develop
+--[[ Develop
 package.path = package.path .. ';../../?.lua'
 require('workshop.base')
 --]]
