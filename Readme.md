@@ -1,112 +1,101 @@
-# What
+## What
 
-(2024-11)
+(2024-11, 2026-04)
 
-Command-line tool to aggregate all `*.lua` files in current directory
+Command-line tool to aggregate all `*.lua` files in given directory
 (and subdirectories) into one.
+
 
 ## Example
 
-Okay guys, our use case is some multi-file Lua project. At the end
-we want to see one Lua file which can be distributed independently.
+```
+$ lua meld.lua
 
-* Actually I have some test "project" at [test_case](test_case).
-  Won't lose time typing about it.
-* ```
-  $ lua_code_melder/test_case$ lua test.lua
-  > [Test representation.]
-  ```
-  Okay, looks legit.
-* I'll go straight to "correct" commands. I encourage you to experiment
-  with more obvious ways and understand what they do. Note the directory
-  names to reproduce it.
-* Melding the melder
-  ```
-  $ lua_code_melder/src$ lua meld.lua meld > ../ingots/meld.lua
-  ```
-* Melding the test project
-  ```
-  $ lua_code_melder/test_case$ lua ../ingots/meld.lua test > ../ingots/test.lua
-  ```
-* Test run of melded test project
-  ```
-  lua_code_melder/ingots$ lua test.lua
-  [Test representation.]
-  ```
-  Still looks legit.
+Merge all .lua files under given directory into one executable code block
+and print it.
 
-## Now the fun part (extended example)
+Usage
 
-* Melding the melded melder and melded test project
-  ```
-  $ lua_code_melder/ingots$ lua meld.lua > ../alloy.lua
-  ```
-* Running "test" part of alloy
-  ```
-  $ lua_code_melder$ lua alloy.lua test
-  > [Test representation.]
-  ```
-* Running "melder" part of alloy
-  ```
-  $ lua_code_melder$ lua alloy.lua meld
-  > [... lots of Lua code lines ...]
-  ```
+  meld.lua <modules_dir> <root_module_name>
 
-## How it works?
+Example
+
+  $ lua meld.lua test_case/ test > ingots/test.lua
+
+Parameters
+
+  modules_dir -- Directory from which we search for .lua files
+
+  root_module_name -- Name of the "main" module which is called
+    in generated code block.
+
+-- Martin, 2026-04
+```
+
+
+## How it works
 
 Melder generates Lua source code and prints it to stdout.
 
-It is a file scanner. It gets all `*.lua` files from current dir,
-converts their file names to module names and loads their text (source code).
+It is a file scanner. It gets all `*.lua` files from given `<modules_dir>`
+directory (and subdirectories), converts their file names to module names
+and loads their contents (source code).
 
-It writes them to table
-```Lua
+Then it prints table with them:
+```
 local Modules = {
-  <ModuleName> = ModuleCode
+  <module_name> = <module_code>,
+  [...]
 }
 ```
 
-Then it compiles their code but not runs it. Compiled code is
-stored in `_G.package.preload` table (see Lua documentation).
+Then it prints code that compiles their code but not runs it.
+Compiled code is stored in `_G.package.preload` table (see Lua documentation).
 Hat tip from me to Lua authors for this nice design.
 
 ```Lua
-local AddModule =
-  function(Name, Code)
-    local CompiledCode = assert(load(Code, Name, 't'))
+do
+  local add_module =
+    function(module_name, module_code_str)
+      local compiled_code = assert(load(module_code_str, module_name, 't'))
 
-    _G.package.preload[Name] =
-      function(...)
-        return CompiledCode(...)
-      end
+      _G.package.preload[module_name] =
+        function(...)
+          return compiled_code(...)
+        end
+    end
+
+  for module_name, module_code_str in pairs(Modules) do
+    add_module(module_name, module_code_str)
   end
-
-for ModuleName, ModuleCode in pairs(Modules) do
-  AddModule(ModuleName, ModuleCode)
 end
 ```
 
-And finally it adds activation line, which is a mere `require(<module_name>)`.
+And finally it prints activation line, which is a mere `require(<module_name>)`.
 
-`<module_name>` is that additional command-line argument: `test` or `meld`
-in our examples.
-
-If there is no command-line argument, activation line is `require(arg[1])`.
-Yep. Call any module from library from command-line.
+`<module_name>` is command-line argument `<root_module_name>`.
 
 Sapienti sat.
 
+
 ## Requirements
 
-  * Lua 5.4
+  * Lua 5.5
   * Linux
   * Binutils (`find`)
 
-  As usually all needed guts from `[workshop]` are included in this repo.
-  You can just copy [melder](ingots/meld.lua) and not clone repo at all.
+
+## Install/remove
+
+  Clone repo.
+
+  As usually all needed guts from `[workshop]` are included.
+
 
 ## See also
 
+* [`workshop`][workshop] -- My personal Lua framework on which this tool is based
 * [My other repositories][contents]
 
+[workshop]: https://github.com/martin-eden/workshop
 [contents]: https://github.com/martin-eden/contents
