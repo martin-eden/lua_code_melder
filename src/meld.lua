@@ -16,9 +16,27 @@ require('workshop.base')
 --[[
   To do
 
-  * Ability to run from another directory
-  * Unmeld
+    * Unmeld
+
+      Unmeld works with file, Meld works with directory
+
+  Done
+
+    * Become happy with used [workshop] code
+
+    * snake_case by default
+
+      CamelCase for tables and their fields
+
+    * Ability to run from another directory
+
 ]]
+
+local Config =
+  {
+    ModulesDir = arg[1] or '.',
+    RootModule = arg[2],
+  }
 
 local FilesLister = request('!.concepts.FilesLister.Interface')
 local parse_path_name = request('!.concepts.path_name.parse')
@@ -35,25 +53,12 @@ local is_lua_file =
 
 -- Convert pathname to Lua's require() module name
 local get_module_name =
-  function(path_name)
-    local ParsedName = parse_path_name(path_name)
-
-    assert(not ParsedName.IsDirectory)
-
-    local dir_name = ParsedName.Directory
-    local file_name = ParsedName.Name
-
+  function(file_name)
     local module_name
+
     -- Module name is file name without ".lua" at end
     local module_name_capture = '(.*)%.lua$'
     module_name = string.match(file_name, module_name_capture)
-
-    -- If we are in directory then ..
-    if (dir_name ~= '') then
-      -- .. module name is prefixed with directory path with "/" replaced to "."
-      local module_name_prefix = string.gsub(dir_name, '/', '.')
-      module_name = module_name_prefix .. module_name
-    end
 
     return module_name
   end
@@ -69,7 +74,7 @@ local get_module_name =
 ]]
 local populate_modules
 populate_modules =
-  function(base_dir_name, Result)
+  function(base_dir_name, module_name_prefix, Result)
     FilesLister:SetBaseDirectory(base_dir_name)
 
     local Files = FilesLister:GetFiles()
@@ -78,7 +83,7 @@ populate_modules =
       if is_lua_file(file_name) then
         local full_file_name = base_dir_name .. file_name
         local file_contents = file_as_string(full_file_name)
-        local module_name = get_module_name(full_file_name)
+        local module_name = module_name_prefix .. get_module_name(file_name)
         Result[module_name] = file_contents
       end
     end
@@ -86,14 +91,22 @@ populate_modules =
     local Directories = FilesLister:GetDirectories()
 
     for _, subdir_name in ipairs(Directories) do
-      populate_modules(base_dir_name .. subdir_name, Result)
+      populate_modules(
+        base_dir_name .. subdir_name,
+        module_name_prefix .. string.sub(subdir_name, 1, -2) .. '.',
+        Result
+      )
     end
   end
 
 local get_modules =
-  function()
+  function(start_dir)
+    start_dir = parse_path_name(start_dir).FullName
+
     local Result = {}
-    populate_modules('./', Result)
+
+    populate_modules(start_dir, '', Result)
+
     return Result
   end
 
@@ -110,18 +123,20 @@ local add_modules_table_prefix =
 local add_modules_population_code =
   function(Lines)
     local code_str = [[
-local add_module =
-  function(module_name, module_code_str)
-    local compiled_code = assert(load(module_code_str, module_name, 't'))
+do
+  local add_module =
+    function(module_name, module_code_str)
+      local compiled_code = assert(load(module_code_str, module_name, 't'))
 
-    _G.package.preload[module_name] =
-      function(...)
-        return compiled_code(...)
-      end
+      _G.package.preload[module_name] =
+        function(...)
+          return compiled_code(...)
+        end
+    end
+
+  for module_name, module_code_str in pairs(Modules) do
+    add_module(module_name, module_code_str)
   end
-
-for module_name, module_code_str in pairs(Modules) do
-  add_module(module_name, module_code_str)
 end]]
     Lines:AddLastLine(code_str)
   end
@@ -142,13 +157,13 @@ local add_module_call =
 
 -- Main
 do
-  Lines:FromString(table_to_string(get_modules()))
+  Lines:FromString(table_to_string(get_modules(Config.ModulesDir)))
 
   add_modules_table_prefix(Lines)
   Lines:AddLastLine('')
   add_modules_population_code(Lines)
   Lines:AddLastLine('')
-  add_module_call(Lines, arg[1])
+  add_module_call(Lines, Config.RootModule)
 
   io.write(Lines:ToString())
 end
