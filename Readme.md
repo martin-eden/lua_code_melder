@@ -89,7 +89,7 @@ Sapienti sat.
 
   Clone repo.
 
-  As usually all needed guts from `[workshop]` are included.
+  As usual all needed guts from [`workshop`][workshop] are included.
 
 
 ## See also
