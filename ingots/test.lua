@@ -55,18 +55,20 @@ ModuleA:Represent()
 ]=],
 }
 
-local AddModule =
-  function(Name, Code)
-    local CompiledCode = assert(load(Code, Name, 't'))
+do
+  local add_module =
+    function(module_name, module_code_str)
+      local compiled_code = assert(load(module_code_str, module_name, 't'))
 
-    _G.package.preload[Name] =
-      function(...)
-        return CompiledCode(...)
-      end
+      _G.package.preload[module_name] =
+        function(...)
+          return compiled_code(...)
+        end
+    end
+
+  for module_name, module_code_str in pairs(Modules) do
+    add_module(module_name, module_code_str)
   end
-
-for ModuleName, ModuleCode in pairs(Modules) do
-  AddModule(ModuleName, ModuleCode)
 end
 
 require('test')
