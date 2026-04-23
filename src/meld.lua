@@ -34,9 +34,31 @@ require('workshop.base')
 
 local Config =
   {
-    ModulesDir = arg[1] or '.',
+    ModulesDir = arg[1],
     RootModule = arg[2],
   }
+
+local usage_help = [[
+Merge all .lua files in given directory into one executable code block
+and print it.
+
+Usage
+
+  meld.lua <modules_dir> <root_module_name>
+
+Example
+
+  $ lua ./meld.lua ../test_case/ test > ../ingots/test.lua
+
+Parameters
+
+  modules_dir -- Directory from which we search for .lua files
+
+  root_module_name -- Name of the "main" module which is called
+    in generated code block.
+
+-- Martin, 2026-04
+]]
 
 local FilesLister = request('!.concepts.FilesLister.Interface')
 local parse_path_name = request('!.concepts.path_name.parse')
@@ -145,18 +167,19 @@ local add_module_call =
   function(Lines, module_name)
     local module_call_str
 
-    if is_nil(module_name) then
-      module_call_str = 'require(arg[1])'
-    else
-      local module_call_fmt = "require('%s')"
-      module_call_str = string.format(module_call_fmt, module_name)
-    end
+    local module_call_fmt = "require('%s')"
+    module_call_str = string.format(module_call_fmt, module_name)
 
     Lines:AddLastLine(module_call_str)
   end
 
 -- Main
 do
+  if not Config.ModulesDir then
+    io.write(usage_help)
+    return
+  end
+
   Lines:FromString(table_to_string(get_modules(Config.ModulesDir)))
 
   add_modules_table_prefix(Lines)
