@@ -2,8 +2,7 @@
 
 --[[
   Author: Martin Eden
-  License: LGPL v3
-  Last mod.: 2026-04-22
+  Last mod.: 2026-04-23
 ]]
 
 --[[ Release
@@ -14,28 +13,35 @@ package.path = package.path .. ';../../../?.lua'
 require('workshop.base')
 --]]
 
-local FilesLister = request('!.concepts.FilesLister.Interface')
-local ParsePathName = request('!.concepts.path_name.parse')
-local file_as_string = request('!.file_system.file.as_string')
-local Lines = request('!.concepts.Lines.Interface')
-local table_to_string = request('!.table.as_string')
+--[[
+  To do
 
-local looks_like_module =
+  * Ability to run from another directory
+  * Unmeld
+]]
+
+local FilesLister = request('!.concepts.FilesLister.Interface')
+local parse_path_name = request('!.concepts.path_name.parse')
+local file_as_string = request('!.file_system.file.as_string')
+local table_to_string = request('!.table.as_string')
+local Lines = request('!.concepts.Lines.Interface')
+local string_starts_with = request('!.string.starts_with')
+local string_ends_with = request('!.string.ends_with')
+
+local is_lua_file =
   function(file_name)
-    local lua_file_regexp = '%.lua$'
-    if string.find(file_name, lua_file_regexp) then
-      return true
-    end
-    return false
+    return string_ends_with(file_name, '.lua')
   end
 
 -- Convert pathname to Lua's require() module name
 local get_module_name =
   function(path_name)
-    local ParsedName = ParsePathName(path_name)
-    local dir_name = ParsedName.directory
-    local file_name = ParsedName.name
-    assert(not ParsedName.is_directory)
+    local ParsedName = parse_path_name(path_name)
+
+    assert(not ParsedName.IsDirectory)
+
+    local dir_name = ParsedName.Directory
+    local file_name = ParsedName.Name
 
     local module_name
     -- Module name is file name without ".lua" at end
@@ -69,7 +75,7 @@ populate_modules =
     local Files = FilesLister:GetFiles()
 
     for _, file_name in ipairs(Files) do
-      if looks_like_module(file_name) then
+      if is_lua_file(file_name) then
         local full_file_name = base_dir_name .. file_name
         local file_contents = file_as_string(full_file_name)
         local module_name = get_module_name(full_file_name)
@@ -91,15 +97,11 @@ local get_modules =
     return Result
   end
 
-local Modules = get_modules()
-local modules_table_str = table_to_string(Modules)
-Lines:FromString(modules_table_str)
-
 -- Start first line in table definition string from "local Modules = " ..
 local add_modules_table_prefix =
   function(Lines)
     local first_line = Lines:GetFirstLine()
-    assert(string.sub(first_line, 1, 1) == '{')
+    assert(string_starts_with(first_line, '{'))
     first_line = 'local Modules = ' .. first_line
     Lines:RemoveFirstLine()
     Lines:AddFirstLine(first_line)
@@ -125,28 +127,34 @@ end]]
   end
 
 local add_module_call =
-  function(module_name)
+  function(Lines, module_name)
     local module_call_str
 
-    if is_string(module_name) then
+    if is_nil(module_name) then
+      module_call_str = 'require(arg[1])'
+    else
       local module_call_fmt = "require('%s')"
       module_call_str = string.format(module_call_fmt, module_name)
-    else
-      module_call_str = 'require(arg[1])'
     end
 
     Lines:AddLastLine(module_call_str)
   end
 
-add_modules_table_prefix(Lines)
-Lines:AddLastLine('')
-add_modules_population_code(Lines)
-Lines:AddLastLine('')
-add_module_call(arg[1])
+-- Main
+do
+  Lines:FromString(table_to_string(get_modules()))
 
-io.write(Lines:ToString())
+  add_modules_table_prefix(Lines)
+  Lines:AddLastLine('')
+  add_modules_population_code(Lines)
+  Lines:AddLastLine('')
+  add_module_call(Lines, arg[1])
+
+  io.write(Lines:ToString())
+end
 
 --[[
   2024-11-20
   2026-04-22
+  2026-04-23
 ]]
