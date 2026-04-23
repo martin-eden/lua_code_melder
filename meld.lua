@@ -39,6 +39,7 @@ local Config =
   }
 
 local usage_help = [[
+
 Merge all .lua files under given directory into one executable code block
 and print it.
 
@@ -48,7 +49,7 @@ Usage
 
 Example
 
-  $ lua ./meld.lua ../test_case/ test > ../ingots/test.lua
+  $ lua meld.lua test_case/ test > ingots/test.lua
 
 Parameters
 
