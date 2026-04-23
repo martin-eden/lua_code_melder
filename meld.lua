@@ -55,7 +55,7 @@ local is_lua_file =
     return string_ends_with(file_name, '.lua')
   end
 
--- Convert pathname to Lua's require() module name
+-- Convert file name (without dir) to Lua's require() module name
 local get_module_name =
   function(file_name)
     local module_name
