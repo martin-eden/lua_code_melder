@@ -118,16 +118,26 @@ local add_module_registration =
   function(Lines, module_name, module_code)
     local quoted_module_name = lua_quote_string(module_name)
 
+    --[[ Indent modules code
+    --[=[
+      Indenting source code will add spaces to multi-line strings!
+
+      We don't parse source code so can't detect them.
+      Usually there are no multi-line strings in code
+      but if they are -- spaces will be added to their contents.
+
+      So enable this block if you can test combined code.
+    ]=]
     local ModuleLines = new(LinesClass)
     ModuleLines:FromString(module_code)
     ModuleLines:Indent()
     ModuleLines:Indent()
-
-    local indented_module_code = ModuleLines:ToString()
+    module_code = ModuleLines:ToString()
+    --]]
 
     Lines:AddLastLine('_G.package.preload[' .. quoted_module_name .. '] =')
     Lines:AddLastLine('  function(...)')
-    Lines:AddLastLine(indented_module_code)
+    Lines:AddLastLine(module_code)
     Lines:AddLastLine('  end')
   end
 
