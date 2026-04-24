@@ -16,7 +16,7 @@ and print it.
 
 Usage
 
-  meld.lua <modules_dir> <root_module_name>
+  meld.lua <modules_dir> <root_module_name> [--indent]
 
 Example
 
@@ -24,10 +24,17 @@ Example
 
 Parameters
 
-  modules_dir -- Directory from which we search for .lua files
+  <modules_dir> -- Directory from which we search for .lua files
 
-  root_module_name -- Name of the "main" module which is called
+  <root_module_name> -- Name of the "main" module which is called
     in generated code block.
+
+  --indent -- Indent code of embedded modules for nice output.
+
+    Indenting is not safe for code! If source code has multi-line strings
+    then spaces will be added to them.
+
+    So if you can test/review result code -- use this option.
 
 -- Martin, 2026-04
 ```
@@ -41,39 +48,47 @@ It is a file scanner. It gets all `*.lua` files from given `<modules_dir>`
 directory (and subdirectories), converts their file names to module names
 and loads their contents (source code).
 
-Then it prints table with them:
+Then it prints code to fill global `package.preload` table (see Lua documentation)
+with entries like
+
 ```
-local Modules = {
-  <module_name> = <module_code>,
-  [...]
-}
+_G.package.preload[<module_name>] =
+  function(...)
+<module_code>
+  end
 ```
 
-Then it prints code that compiles their code but not runs it.
-Compiled code is stored in `_G.package.preload` table (see Lua documentation).
-Hat tip from me to Lua authors for this nice design.
+Module's code is not indented by default. Produced result is safe but ugly.
+
+If `--indent` option is provided then... well then module's code is indented.
+It will produce nice foldable output but it's not safe for code.
+
+If code contains multi-line strings like
 
 ```Lua
-do
-  local add_module =
-    function(module_name, module_code_str)
-      local compiled_code = assert(load(module_code_str, module_name, 't'))
+print([[
+Hello there!
 
-      _G.package.preload[module_name] =
-        function(...)
-          return compiled_code(...)
-        end
-    end
+Multi-line strings in Lua are so cool and hard to capture!
 
-  for module_name, module_code_str in pairs(Modules) do
-    add_module(module_name, module_code_str)
-  end
-end
+]])
 ```
+
+then indentation spaces will change contents of string constant.
+
+So use it if you can test or review result code. (Or just sure there are
+no multi-line strings. Or really want to.)
 
 And finally it prints activation line, which is a mere `require(<module_name>)`.
 
 `<module_name>` is command-line argument `<root_module_name>`.
+
+
+Credits:
+
+  * Idea to embed source just as `function(...)` was shared by `mjmouse9999`
+    at Lua [maillist][maillist_msg] 2026-04-24
+  * Lua authors for ["preload" concept][preload_doc]
 
 Sapienti sat.
 
@@ -96,6 +111,9 @@ Sapienti sat.
 
 * [`workshop`][workshop] -- My personal Lua framework on which this tool is based
 * [My other repositories][contents]
+
+[maillist_msg]: https://groups.google.com/g/lua-l/c/AuXFlvZr42M/m/dwO9Aob1AAAJ
+[preload_doc]: https://lua.org/manual/5.5/manual.html#pdf-package.preload
 
 [workshop]: https://github.com/martin-eden/workshop
 [contents]: https://github.com/martin-eden/contents
