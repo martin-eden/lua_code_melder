@@ -31,7 +31,7 @@ Usage
 
 Example
 
-  $ lua meld.lua test_case/ test > ingots/test.lua
+  $ lua meld.lua test_case/ test --indent > ingots/test.lua
 
 Parameters
 
