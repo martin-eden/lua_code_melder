@@ -132,12 +132,21 @@ local add_module_registration =
       ModuleLines:Indent()
       ModuleLines:Indent()
       module_code = ModuleLines:ToString()
-    end
 
-    Lines:AddLastLine('_G.package.preload[' .. quoted_module_name .. '] =')
-    Lines:AddLastLine('  function(...)')
-    Lines:AddLastLine(module_code)
-    Lines:AddLastLine('  end')
+      Lines:AddLastLine('_G.package.preload[' .. quoted_module_name .. '] =')
+      Lines:AddLastLine('  function(...)')
+      Lines:AddLastLine(module_code)
+      Lines:AddLastLine('  end')
+    else
+      local module_id = 'module ' .. module_name
+
+      Lines:AddLastLine('-- ( ' .. module_id)
+      Lines:AddLastLine('_G.package.preload[' .. quoted_module_name .. '] =')
+      Lines:AddLastLine('function(...)')
+      Lines:AddLastLine(module_code)
+      Lines:AddLastLine('end')
+      Lines:AddLastLine('-- ) ' .. module_id)
+    end
   end
 
 local add_module_call =
