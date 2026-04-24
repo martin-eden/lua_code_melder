@@ -2,13 +2,21 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-04-23
+  Last mod.: 2026-04-24
 ]]
 
--- [[ Release
+--[[
+  To do
+
+    * Embed source contents directly into package.preload
+
+      With indents.
+]]
+
+--[[ Release
 require('workshop.base')
 --]]
---[[ Develop
+-- [[ Develop
 package.path = package.path .. ';../../?.lua'
 require('workshop.base')
 --]]
@@ -177,4 +185,5 @@ end
   2024-11-20
   2026-04-22
   2026-04-23
+  2026-04-24
 ]]
