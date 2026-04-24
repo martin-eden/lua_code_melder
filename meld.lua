@@ -17,6 +17,7 @@ local Config =
   {
     ModulesDir = arg[1],
     RootModule = arg[2],
+    DoIndent = (arg[3] == '--indent'),
   }
 
 local usage_help = [[
@@ -26,7 +27,7 @@ and print it.
 
 Usage
 
-  meld.lua <modules_dir> <root_module_name>
+  meld.lua <modules_dir> <root_module_name> [--indent]
 
 Example
 
@@ -34,10 +35,17 @@ Example
 
 Parameters
 
-  modules_dir -- Directory from which we search for .lua files
+  <modules_dir> -- Directory from which we search for .lua files
 
-  root_module_name -- Name of the "main" module which is called
+  <root_module_name> -- Name of the "main" module which is called
     in generated code block.
+
+  --indent -- Indent code of embedded modules for nice output.
+
+    Indenting is not safe for code! If source code has multi-line strings
+    then spaces will be added to them.
+
+    So if you can test/review result code -- use this option.
 
 -- Martin, 2026-04
 ]]
@@ -115,25 +123,16 @@ local get_modules =
   end
 
 local add_module_registration =
-  function(Lines, module_name, module_code)
+  function(Lines, module_name, module_code, do_indent)
     local quoted_module_name = lua_quote_string(module_name)
 
-    --[[ Indent modules code
-    --[=[
-      Indenting source code will add spaces to multi-line strings!
-
-      We don't parse source code so can't detect them.
-      Usually there are no multi-line strings in code
-      but if they are -- spaces will be added to their contents.
-
-      So enable this block if you can test combined code.
-    ]=]
-    local ModuleLines = new(LinesClass)
-    ModuleLines:FromString(module_code)
-    ModuleLines:Indent()
-    ModuleLines:Indent()
-    module_code = ModuleLines:ToString()
-    --]]
+    if do_indent then
+      local ModuleLines = new(LinesClass)
+      ModuleLines:FromString(module_code)
+      ModuleLines:Indent()
+      ModuleLines:Indent()
+      module_code = ModuleLines:ToString()
+    end
 
     Lines:AddLastLine('_G.package.preload[' .. quoted_module_name .. '] =')
     Lines:AddLastLine('  function(...)')
@@ -163,7 +162,7 @@ do
   local Lines = new(LinesClass)
 
   for module_name, module_code in ordered_pairs(Modules) do
-    add_module_registration(Lines, module_name, module_code)
+    add_module_registration(Lines, module_name, module_code, Config.DoIndent)
     Lines:AddLastLine('')
   end
 
