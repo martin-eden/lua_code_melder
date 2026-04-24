@@ -5,14 +5,6 @@
   Last mod.: 2026-04-24
 ]]
 
---[[
-  Done
-
-    * Embed source contents directly into package.preload
-
-      With indents.
-]]
-
 --[[ Release
 require('workshop.base')
 --]]
