@@ -2,7 +2,7 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-04-24
+  Last mod.: 2026-04-25
 ]]
 
 -- [[ Release
@@ -22,8 +22,8 @@ local Config =
 
 local usage_help = [[
 
-Merge all .lua files under given directory into one executable code block
-and print it.
+Merge all .lua files under given directory into one executable code
+block and print it.
 
 Usage
 
