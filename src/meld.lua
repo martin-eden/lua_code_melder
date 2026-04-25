@@ -22,8 +22,8 @@ local Config =
 
 local usage_help = [[
 
-Merge all .lua files under given directory into one executable code
-block and print it.
+Merge all .lua files under given directory into one executable
+code block and print it.
 
 Usage
 
