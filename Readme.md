@@ -11,8 +11,8 @@ Command-line tool to aggregate all `*.lua` files in given directory
 ```
 $ lua meld.lua
 
-Merge all .lua files under given directory into one executable code block
-and print it.
+Merge all .lua files under given directory into one executable
+code block and print it.
 
 Usage
 
@@ -95,7 +95,7 @@ Sapienti sat.
 
 ## Requirements
 
-  * Lua 5.5
+  * Lua 5.3 (or 5.4, 5.5)
   * Linux
   * Binutils (`find`)
 
@@ -107,6 +107,30 @@ Sapienti sat.
   As usual all needed guts from [`workshop`][workshop] are included.
 
 
+## Additional stuff
+
+  * There is compiled binary in [`bin/`][bin]
+
+    That's melded code of this tool compiled by `luac` (v5.3) and
+    shebang line `#! /usr/local/bin/lua`.
+
+    Practically it means that if you have Lua 5.3 (and under Linux)
+    you can just save this file to your `~/bin` and use it as
+    `meld` command.
+
+  * There are build scripts in [`deploy_maker/`][deploy_maker]
+
+    That's my scripts I used to generate compiled binary.
+
+    You can use them too but you'll need to clone [`workshop`][workshop]
+    repo into `src/workshop` (replacing existing one) and (in case
+    of problems) rollback `workshop`'s date to near current date,
+    2026-04-25.
+
+    That's because deploy generation requires more workshop's code
+    than this tool.
+
+
 ## See also
 
 * [`workshop`][workshop] -- My personal Lua framework on which this tool is based
@@ -115,5 +139,7 @@ Sapienti sat.
 [maillist_msg]: https://groups.google.com/g/lua-l/c/AuXFlvZr42M/m/dwO9Aob1AAAJ
 [preload_doc]: https://lua.org/manual/5.5/manual.html#pdf-package.preload
 
+[bin]: bin/
+[deploy_maker]: deploy_maker/
 [workshop]: https://github.com/martin-eden/workshop
 [contents]: https://github.com/martin-eden/contents
