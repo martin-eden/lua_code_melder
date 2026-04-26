@@ -2,14 +2,14 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-04-25
+  Last mod.: 2026-04-26
 ]]
 
 -- [[ Release
 require('workshop.base')
 --]]
 --[[ Develop
-package.path = package.path .. ';../../?.lua'
+package.path = package.path .. ';../../../?.lua'
 require('workshop.base')
 --]]
 
@@ -88,6 +88,7 @@ local populate_modules
 populate_modules =
   function(base_dir_name, module_name_prefix, Result)
     FilesLister:SetBaseDirectory(base_dir_name)
+    base_dir_name = FilesLister:GetBaseDirectory()
 
     local Files = FilesLister:GetFiles()
 
@@ -105,7 +106,7 @@ populate_modules =
     for _, subdir_name in ipairs(Directories) do
       populate_modules(
         base_dir_name .. subdir_name,
-        module_name_prefix .. string.sub(subdir_name, 1, -2) .. '.',
+        module_name_prefix .. string.sub(subdir_name, 1, -1) .. '.',
         Result
       )
     end
@@ -161,7 +162,7 @@ local add_module_call =
 
 -- Main
 do
-  if not Config.ModulesDir then
+  if not Config.ModulesDir or not Config.RootModule then
     io.write(usage_help)
     return
   end
