@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/sh
 
 #
 # Pack script into executable Lua file
@@ -6,7 +6,7 @@
 
 #
 # Author: Martin Eden
-# Last mod.: 2026-04-25
+# Last mod.: 2026-04-26
 #
 
 #
@@ -15,24 +15,23 @@
 #
 
 cp create_deploy.lua ../src
-cd ..
 
-cd src
+cd ../src
+
 lua create_deploy.lua
 rm create_deploy.lua
 bash deploy.sh
 rm deploy.sh
 lua meld.lua deploy/ meld > ../deploy_maker/meld.melded.lua
-pwd
 rm -r deploy
-cd ..
 
-cd deploy_maker
+cd ../deploy_maker
+
 luac -o meld.melded.luac -s meld.melded.lua
 rm meld.melded.lua
 
-shebang='#! /usr/local/bin/lua'
-echo $shebang > meld.melded.shebang_luac
+shebang='#!/usr/local/bin/lua'
+echo "$shebang" > meld.melded.shebang_luac
 cat meld.melded.luac >> meld.melded.shebang_luac
 rm meld.melded.luac
 
