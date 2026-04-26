@@ -96,8 +96,8 @@ Sapienti sat.
 ## Requirements
 
   * Lua 5.3 (or 5.4, 5.5)
-  * Linux
-  * Binutils (`find`)
+  * Linux file system
+  * Commands (`sh`, `find`)
 
 
 ## Install/remove
@@ -112,11 +112,10 @@ Sapienti sat.
   * There is compiled binary in [`bin/`][bin]
 
     That's melded code of this tool compiled by `luac` (v5.3) and
-    shebang line `#! /usr/local/bin/lua`.
+    shebang line `#!/usr/local/bin/lua`.
 
     Practically it means that if you have Lua 5.3 (and under Linux)
-    you can just save this file to your `~/bin` and use it as
-    `meld` command.
+    you can save this file to your `~/bin` and use it as `meld` command.
 
   * There are build scripts in [`deploy_maker/`][deploy_maker]
 
