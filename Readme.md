@@ -1,3 +1,5 @@
+[![DeepWiki][DeepWiki_Logo]][DeepWiki_Repo] (sometimes AI explains it better)
+
 ## What
 
 (2024-11, 2026-04)
@@ -134,6 +136,9 @@ Sapienti sat.
 
 * [`workshop`][workshop] -- My personal Lua framework on which this tool is based
 * [My other repositories][contents]
+
+[DeepWiki_Logo]: https://deepwiki.com/badge.svg
+[DeepWiki_Repo]: https://deepwiki.com/martin-eden/lua_code_melder
 
 [maillist_msg]: https://groups.google.com/g/lua-l/c/AuXFlvZr42M/m/dwO9Aob1AAAJ
 [preload_doc]: https://lua.org/manual/5.5/manual.html#pdf-package.preload
