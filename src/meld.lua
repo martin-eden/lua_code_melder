@@ -2,16 +2,13 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-04-26
+  Last mod.: 2026-06-04
 ]]
 
--- [[ Release
-require('workshop.base')
---]]
 --[[ Develop
 package.path = package.path .. ';../../../?.lua'
-require('workshop.base')
 --]]
+require('workshop.base')
 
 local Config =
   {
@@ -52,7 +49,7 @@ Parameters
 
 local FilesLister = request('!.concepts.FilesLister.Interface')
 local parse_path_name = request('!.concepts.path_name.parse')
-local file_as_string = request('!.file_system.file.as_string')
+local file_to_str = request('!.convert.file_to_str')
 local LinesClass = request('!.concepts.Lines.Interface')
 local string_ends_with = request('!.string.ends_with')
 local ordered_pairs = request('!.table.ordered_pass')
@@ -95,7 +92,7 @@ populate_modules =
     for _, file_name in ipairs(Files) do
       if is_lua_file(file_name) then
         local full_file_name = base_dir_name .. file_name
-        local file_contents = file_as_string(full_file_name)
+        local file_contents = file_to_str(full_file_name)
         local module_name = module_name_prefix .. get_module_name(file_name)
         Result[module_name] = file_contents
       end
@@ -186,4 +183,5 @@ end
   2026-04-22
   2026-04-23
   2026-04-24
+  2026-06-04
 ]]
