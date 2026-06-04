@@ -2,7 +2,9 @@
 
 ## What
 
-(2024-11, 2026-06)
+| Created | Updated | Code size | License |
+|:-------:|:-------:|:---------:|:-------:|
+| 2024-11 | 2026-06 |  < 30 K   |  LGPL3  |
 
 Command-line tool to aggregate all `*.lua` files in given directory
 (and subdirectories) into one.
