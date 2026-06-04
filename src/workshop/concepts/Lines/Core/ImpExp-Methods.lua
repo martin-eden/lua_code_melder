@@ -2,30 +2,34 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-04-26
+  Last mod.: 2026-05-04
 ]]
 
 -- Imports:
-local trim_tail_nl = request('!.string.trim_linefeed')
-local string_to_lines = request('!.string.to_lines')
-local lines_to_string = request('!.string.from_lines')
+local trim_tail_nls = request('!.string.trim_tail_nls')
+local trim_tail_spaces = request('!.string.trim_tail')
+local lines_from_str = request('!.convert.lines_from_str')
+local lines_to_str = request('!.convert.lines_to_str')
 
 -- Convert string to line value
 local ToItem =
   function(Me, str)
-    return trim_tail_nl(str)
+    str = trim_tail_nls(str)
+    str = trim_tail_spaces(str)
+
+    return str
   end
 
 -- Explode string to list of lines
 local FromString =
   function(Me, lines_str)
-    Me.Items = string_to_lines(lines_str)
+    Me.Items = lines_from_str(lines_str)
   end
 
 -- Implode list of lines to string
 local ToString =
   function(Me)
-    return lines_to_string(Me.Items)
+    return lines_to_str(Me.Items)
   end
 
 -- Export:
