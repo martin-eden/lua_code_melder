@@ -2,7 +2,7 @@
 
 ## What
 
-(2024-11, 2026-04)
+(2024-11, 2026-06)
 
 Command-line tool to aggregate all `*.lua` files in given directory
 (and subdirectories) into one.
@@ -119,17 +119,14 @@ Sapienti sat.
     Practically it means that if you have Lua 5.3 (and under Linux)
     you can save this file to your `~/bin` and use it as `meld` command.
 
-  * There are build scripts in [`deploy_maker/`][deploy_maker]
+  * There are build scripts in [`build/`][build]
 
-    That's my scripts I used to generate compiled binary.
+    They are used to generate compiled binary.
 
-    You can use them too but you'll need to clone [`workshop`][workshop]
-    repo into `src/workshop` (replacing existing one) and (in case
-    of problems) rollback `workshop`'s date to near current date,
-    2026-04-25.
-
-    That's because deploy generation requires more workshop's code
-    than this tool.
+    You can use them too but you'll need clone of [`workshop`][workshop]
+    repo reachable via `package.path` in `build/create_deploy.lua`.
+    In case of compatibility problems rollback repo near current date,
+    2026-06-04.
 
 
 ## See also
@@ -144,6 +141,6 @@ Sapienti sat.
 [preload_doc]: https://lua.org/manual/5.5/manual.html#pdf-package.preload
 
 [bin]: bin/
-[deploy_maker]: deploy_maker/
+[build]: build/
 [workshop]: https://github.com/martin-eden/workshop
 [contents]: https://github.com/martin-eden/contents
