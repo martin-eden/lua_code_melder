@@ -1,27 +1,11 @@
 #!/usr/local/bin/lua
 
--- ( ( module meld )
 _G.package.preload['meld'] =
-function(...)
--- Aggregate Lua source files in current directory to one
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-16
-]]
-
---[[ Develop
-package.path = package.path .. ';../../../?.lua'
---]]
-require('workshop.base')
-
-local Config =
-  {
-    modules_dir = arg[1],
-    root_module = arg[2],
-  }
-
-local usage_help = [[
+  function(...)
+    require('workshop.base')
+    local Config = {modules_dir = arg[1], root_module = arg[2]}
+    local usage_help =
+      [[
 Merge all .lua files under given directory into one executable
 code block and print it.
 
@@ -42,2575 +26,1059 @@ Parameters
 
 -- Martin, 2026-06
 ]]
-
--- Imports:
-local add_dir_postfix = request('!.concepts.path_name.add_dir_postfix')
-local FilesLister = request('!.concepts.FilesLister.Interface')
-local file_to_str = request('!.convert.file_to_str')
-local add_to_list = request('!.concepts.list.add_item')
-local string_ends_with = request('!.string.ends_with')
-local lua_quote_string = request('!.concepts.lua.quote_string')
-
-local is_lua_file =
-  function(file_name)
-    return string_ends_with(file_name, '.lua')
-  end
-
--- Convert file name (without dir) to Lua's require() module name
-local get_module_name =
-  function(file_name)
-    -- Module name is file name without ".lua" at end
-
-    local module_name_capture = '(.*)%.lua$'
-
-    return string.match(file_name, module_name_capture)
-  end
-
---[[
-  Files visitor
-
-  For each Lua file in current directory:
-
-    * Gets it's name as module name (for require())
-    * Gets it's contents
-    * Adds to Result table: { module_name, file_contents }
-]]
-local get_modules
-get_modules =
-  function(base_dir_name, module_name_prefix, Result)
-    FilesLister:SetBaseDirectory(base_dir_name)
-
-    local Files = FilesLister:GetFiles()
-
-    for _, file_name in ipairs(Files) do
-      if not is_lua_file(file_name) then goto next end
-
-      local module_name = module_name_prefix .. get_module_name(file_name)
-      local module_code = file_to_str(base_dir_name .. file_name)
-
-      add_to_list(Result, { module_name, module_code })
-
-      :: next ::
-    end
-
-    local Directories = FilesLister:GetDirectories()
-
-    for _, subdir_name in ipairs(Directories) do
-      get_modules(
-        base_dir_name .. subdir_name .. '/',
-        module_name_prefix .. subdir_name .. '.',
-        Result
-      )
-    end
-  end
-
-local get_modules =
-  function(start_dir)
-    local Result = { }
-
-    get_modules(start_dir, '', Result)
-
-    return Result
-  end
-
-local emit =
-  function(str)
-    io.write(str)
-
-    local newline = '\n'
-
-    if not string_ends_with(str, newline) then
-      io.write(newline)
-    end
-  end
-
-local add_module_registration =
-  function(module_name, module_code)
-    local quoted_module_name = lua_quote_string(module_name)
-
-    local module_id = '( module ' .. module_name .. ' )'
-
-    emit('-- ( ' .. module_id)
-    emit('_G.package.preload[' .. quoted_module_name .. '] =')
-    emit('function(...)')
-    emit(module_code)
-    emit('end')
-    emit('-- ) ' .. module_id)
-    emit('')
-  end
-
-local add_module_call =
-  function(module_name)
-    emit("require('" ..module_name .. "')")
-  end
-
-local meld =
-  function(modules_dir, root_module)
-    local Modules = get_modules(modules_dir)
-
-    for _, Rec in ipairs(Modules) do
-      local module_name = Rec[1]
-      local module_code = Rec[2]
-
-      add_module_registration(module_name, module_code)
-    end
-
-    add_module_call(root_module)
-  end
-
--- Main:
-do
-  local modules_dir = Config.modules_dir
-  local root_module = Config.root_module
-
-  if not modules_dir or not root_module then
-    io.write(usage_help)
-
-    return
-  end
-
-  modules_dir = add_dir_postfix(modules_dir)
-
-  meld(modules_dir, root_module)
-end
-
---[[
-  2024-11-20
-  2026-04 # # #
-  2026-06-04
-  2026-06-16
-]]
-end
--- ) ( module meld )
-
--- ( ( module workshop.base )
-_G.package.preload['workshop.base'] =
-function(...)
--- Personal framework bootloader
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-05-29
-]]
-
---[[
-  Point of code organization with small files and directories
-  is relative "require()" and ability to deploy only used files.
-]]
-
---[[
-  Installed globals
-
-  * Global "request()"
-
-    Relative "require()" which allows loading modules by name
-    related to caller's module directory.
-
-    Uses extended name syntax: "^." -- upper directory,
-    "!." -- directory of this "base.lua" module.
-
-  * Global "get_dependencies()"
-
-    Table with names map. Implementation of "request()" tracks run-time
-    dependencies.
-
-  * Global "get_base_prefix()"
-
-    Implementation of "request()" knows it's own module name prefix
-    for "require()". It's critical information for niche tools.
-
-  * Global "get_require_name()"
-
-    Not essential -- can be recreated with already provided information.
-    Used by [require_file]. Shared because we don't like duplicate code.
-
-  * Convenience globals
-
-    These functions are actually modules but made global because
-    they are using often:
-
-    * is_..() family
-
-      is_boolean(), is_number, is_integer(), is_float(), is_table() ...
-
-    * assert_..() family
-
-      assert_boolean(), assert_number(), assert_integer(), ...
-
-    * new() -- clones table and applies optional field overrides
-]]
-
-local split_name =
-  function(qualified_name)
-    local prefix_name_pattern = '^(.+%.)([^%.]+)$'  -- a.b.c --> (a.b.) (c)
-    local prefix, name = qualified_name:match(prefix_name_pattern)
-    if not prefix then
-      prefix = ''
-      name = qualified_name
-      if not name:find('^([^%.]+)$') then
-        name = ''
+    local add_dir_postfix = request('!.concepts.path_name.add_dir_postfix')
+    local FilesLister = request('!.concepts.FilesLister.Interface')
+    local file_to_str = request('!.convert.file_to_str')
+    local add_to_list = request('!.concepts.list.add_item')
+    local string_ends_with = request('!.string.ends_with')
+    local lua_quote_string = request('!.concepts.lua.quote_string')
+    local is_lua_file =
+      function(file_name)
+        return string_ends_with(file_name, '.lua')
       end
-    end
-    return prefix, name
-  end
-
-local unite_prefixes =
-  function(base_prefix, rel_prefix)
-    local init_base_prefix, init_rel_prefix = base_prefix, rel_prefix
-    local list_without_tail_pattern = '(.+%.)[^%.]-%.$' -- a.b.c. --> (a.b.)
-    local list_without_head_pattern = '[^%.]+%.(.+)$' -- a.b.c. --> (b.c.)
-    while rel_prefix:find('^%^%.') do
-      if (base_prefix == '') then
-        error(
-          ([[Link "%s" is outside of caller's prefix "%s".]]):format(
-            init_rel_prefix,
-            init_base_prefix
+    local get_module_name =
+      function(file_name)
+        local module_name_capture = '(.*)%.lua$'
+        return string.match(file_name, module_name_capture)
+      end
+    local get_modules
+    get_modules =
+      function(base_dir_name, module_name_prefix, Result)
+        FilesLister:SetBaseDirectory(base_dir_name)
+        local Files = FilesLister:GetFiles()
+        for _, file_name in ipairs(Files) do
+          if not is_lua_file(file_name) then
+            goto next
+          end
+          local module_name = module_name_prefix .. get_module_name(file_name)
+          local module_code = file_to_str(base_dir_name .. file_name)
+          add_to_list(Result, {module_name, module_code})
+          ::next::
+        end
+        local Directories = FilesLister:GetDirectories()
+        for _, subdir_name in ipairs(Directories) do
+          get_modules(
+            base_dir_name .. subdir_name .. '/',
+            module_name_prefix .. subdir_name .. '.',
+            Result
           )
-        )
-      end
-      base_prefix = base_prefix:match(list_without_tail_pattern) or ''
-      rel_prefix = rel_prefix:match(list_without_head_pattern) or ''
-    end
-    return base_prefix .. rel_prefix
-  end
-
-local Names = { }
-local depth = 1
-
-local get_caller_prefix =
-  function()
-    local result = ''
-    if Names[depth] then
-      result = Names[depth].prefix
-    end
-    return result
-  end
-
-local get_caller_name =
-  function()
-    local result = 'anonymous'
-
-    if Names[depth] then
-      result = Names[depth].prefix .. Names[depth].name
-    end
-
-    return result
-  end
-
-local push =
-  function(prefix, name)
-    depth = depth + 1
-    Names[depth] = { prefix = prefix, name = name }
-  end
-
-local pop =
-  function()
-    depth = depth - 1
-  end
-
-local Dependencies_Map = { }
-
-local add_dependency =
-  function(src_name, dest_name)
-    Dependencies_Map[src_name] = Dependencies_Map[src_name] or { }
-
-    Dependencies_Map[src_name][dest_name] = true
-  end
-
-local base_prefix = split_name((...))
-
-local get_require_name =
-  function(qualified_name)
-    local caller_prefix
-
-    local is_absolute_name = (qualified_name:sub(1, 2) == '!.')
-
-    if is_absolute_name then
-      qualified_name = qualified_name:sub(3)
-      caller_prefix = base_prefix
-    else
-      caller_prefix = get_caller_prefix()
-    end
-
-    local prefix, name = split_name(qualified_name)
-
-    prefix = unite_prefixes(caller_prefix, prefix)
-
-    return prefix .. name, prefix, name
-  end
-
-local request =
-  function(qualified_name)
-    local src_name = get_caller_name()
-
-    local require_name, prefix, name = get_require_name(qualified_name)
-
-    push(prefix, name)
-
-    local dest_name = get_caller_name()
-
-    add_dependency(src_name, dest_name)
-
-    local Results = table.pack(require(require_name))
-
-    pop()
-
-    return table.unpack(Results)
-  end
-
-local is_first_run = (_G.request == nil)
-
--- Export globals:
-if is_first_run then
-  _G.request = request
-  _G.get_dependencies = function() return Dependencies_Map end
-  _G.get_base_prefix = function() return base_prefix end
-  _G.get_require_name = get_require_name
-
-  -- We can now use request() but need to add our name to call stack
-
-  -- First element is invocation module name
-  local our_require_name = (...)
-
-  push('', our_require_name)
-
-  request('!.system.install_is_functions')()
-  request('!.system.install_assert_functions')()
-  _G.new = request('!.table.new')
-
-  pop()
-end
-
---[[
-  2016 #
-  2017 #
-  2018 # #
-  2024 #
-  2026-05-08
-  2026-05-28
-]]
-end
--- ) ( module workshop.base )
-
--- ( ( module workshop.system.install_is_functions )
-_G.package.preload['workshop.system.install_is_functions'] =
-function(...)
--- Function to create "is_<type>" family of global functions
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-16
-]]
-
---[[
-  It spawns "is_nil", "is_boolean", ... for all Lua data types.
-  Also it spawns "is_integer" and "is_float" for number type.
-]]
-
--- Imports:
-local TypeNames = request('!.concepts.lua.TypeNames')
-local NumberTypeNames = request('!.concepts.lua.NumberTypeNames')
-
-local type_is =
-  function(type_name)
-    return
-      function(val)
-        return (type(val) == type_name)
-      end
-  end
-
-local number_is =
-  function(type_name)
-    return
-      function(val)
-        --[[
-          math.type() throws error for non-number types.
-          This function returns "false" for non-number types.
-        ]]
-        if not is_number(val) then
-          return false
-        end
-        return (math.type(val) == type_name)
-      end
-  end
-
-local install_is_functions =
-  function()
-    for _, type_name in ipairs(TypeNames) do
-      _G['is_' .. type_name] = type_is(type_name)
-    end
-    for _, math_type_name in ipairs(NumberTypeNames) do
-      _G['is_' .. math_type_name] = number_is(math_type_name)
-    end
-  end
-
--- Export:
-return install_is_functions
-
---[[
-  2018-02
-  2020 #
-  2022 #
-  2024 #
-  2026-04-22
-]]
-end
--- ) ( module workshop.system.install_is_functions )
-
--- ( ( module workshop.system.get_program_output_lines )
-_G.package.preload['workshop.system.get_program_output_lines'] =
-function(...)
--- Execute shell command and return output as list of lines
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-05-30
-]]
-
--- Imports:
-local shell_execute = request('!.concepts.shell.execute')
-local lines_from_str = request('!.convert.lines_from_str')
-
-local get_program_output_lines =
-  --[[
-    Execute shell command in given string.
-    Return command output as list of lines.
-  ]]
-  function(shell_cmd)
-    assert_string(shell_cmd)
-
-    local ExecResult = shell_execute(shell_cmd)
-
-    return lines_from_str(ExecResult.output)
-  end
-
--- Export:
-return get_program_output_lines
-
---[[
-  2017 #
-  2024 # #
-  2026-04-22
-]]
-end
--- ) ( module workshop.system.get_program_output_lines )
-
--- ( ( module workshop.system.install_assert_functions )
-_G.package.preload['workshop.system.install_assert_functions'] =
-function(...)
--- Function to create "assert_<type>" global functions
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-16
-]]
-
--- Imports:
-local TypeNames = request('!.concepts.lua.TypeNames')
-local NumberTypeNames = request('!.concepts.lua.NumberTypeNames')
-
-local spawn_assert_func =
-  function(type_name)
-    local checker = _G['is_'.. type_name]
-
-    assert(checker)
-
-    return
-      function(val)
-        if not checker(val) then
-          local err_msg =
-            string.format('assert_%s(%s)', type_name, tostring(val))
-
-          error(err_msg)
         end
       end
-  end
-
-local install_assert_funcs =
-  function()
-    for _, type_name in ipairs(TypeNames) do
-      _G['assert_' .. type_name] = spawn_assert_func(type_name)
-    end
-
-    for _, number_type_name in ipairs(NumberTypeNames) do
-      _G['assert_' .. number_type_name] = spawn_assert_func(number_type_name)
-    end
-  end
-
--- Export:
-return install_assert_funcs
-
---[[
-  2018-02
-  2020 #
-  2022 #
-  2024 #
-  2026-04-22
-]]
-end
--- ) ( module workshop.system.install_assert_functions )
-
--- ( ( module workshop.lua.regexp.magic_chars )
-_G.package.preload['workshop.lua.regexp.magic_chars'] =
-function(...)
-return '^$()[]%.?*+-'
-end
--- ) ( module workshop.lua.regexp.magic_chars )
-
--- ( ( module workshop.lua.regexp.magic_char_pattern )
-_G.package.preload['workshop.lua.regexp.magic_char_pattern'] =
-function(...)
-local magic_chars = request('magic_chars')
-local magic_char_patttern = '[' .. magic_chars:gsub('.', '%%%0') .. ']'
-return magic_char_patttern
-end
--- ) ( module workshop.lua.regexp.magic_char_pattern )
-
--- ( ( module workshop.lua.regexp.quote )
-_G.package.preload['workshop.lua.regexp.quote'] =
-function(...)
---[[
-  Quote all special regexp symbols in regexp-string.
-  Returns regexp-string.
-
-  Useful when you wish to pass to gsub() string with special
-  characters with their literal meaning.
-
-  Usually you don't want to apply it more than once.
-
-  Example:
-
-    /*
-      Regexp meaning:
-        '.' - any char
-        '%.' - "."
-        '%%%.' - "%."
-    */
-    quote('.') -> '%.'
-    quote('%.') -> '%%%.'
-]]
-
--- Last mod.: 2024-10-20
-
-local magic_char_pattern = request('magic_char_pattern')
-
-return
-  function(s)
-    return s:gsub(magic_char_pattern, '%%%0')
-  end
-
---[[
-  2018-02-05
-  2024-10-20
-]]
-end
--- ) ( module workshop.lua.regexp.quote )
-
--- ( ( module workshop.mechs.cmdline.get_cmd_listfiles )
-_G.package.preload['workshop.mechs.cmdline.get_cmd_listfiles'] =
-function(...)
--- Return shell command to list all files in given directory
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-12
-]]
-
--- Imports:
-local normalize = request('!.concepts.path_name.normalize')
-local quote = request('!.concepts.shell.quote')
-local glue_words = request('!.concepts.words.to_string')
-
--- Export:
-return
-  function(dir_name)
-    local Command =
-      {
-        'find',
-        quote(normalize(dir_name)),
-        '-maxdepth',
-        '1',
-        '-type',
-        'f',
-      }
-
-    return glue_words(Command)
-  end
-
---[[
-  2019 #
-  2024 #
-  2026-01-12
-  2026-04-17
-  2026-04-28
-]]
-end
--- ) ( module workshop.mechs.cmdline.get_cmd_listfiles )
-
--- ( ( module workshop.mechs.cmdline.get_cmd_execute_with_redirects )
-_G.package.preload['workshop.mechs.cmdline.get_cmd_execute_with_redirects'] =
-function(...)
--- Return shell command to execute given string with output redirects
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-12
-]]
-
--- Imports:
-local normalize = request('!.concepts.path_name.normalize')
-local quote = request('!.concepts.shell.quote')
-local glue_words = request('!.concepts.words.to_string')
-
--- Export:
-return
-  function(orig_command, output_file_name, errors_file_name)
-    local Command =
-      {
-        'sh',
-        '-c',
-        quote(orig_command),
-        '1>' .. quote(normalize(output_file_name)),
-        '2>' .. quote(normalize(errors_file_name)),
-      }
-
-    return glue_words(Command)
-  end
-
---[[
-  2026-04-17
-  2026-04-28
-]]
-end
--- ) ( module workshop.mechs.cmdline.get_cmd_execute_with_redirects )
-
--- ( ( module workshop.mechs.cmdline.get_cmd_listdirs )
-_G.package.preload['workshop.mechs.cmdline.get_cmd_listdirs'] =
-function(...)
--- Return shell command to list all directories in given directory
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-12
-]]
-
--- Imports:
-local normalize = request('!.concepts.path_name.normalize')
-local quote = request('!.concepts.shell.quote')
-local glue_words = request('!.concepts.words.to_string')
-
--- Export:
-return
-  function(dir_name)
-    local Command =
-      {
-        'find',
-        quote(normalize(dir_name)),
-        '-maxdepth',
-        '1',
-        '-mindepth',
-        '1',
-        '-type',
-        'd',
-      }
-
-    return glue_words(Command)
-  end
-
---[[
-  2019 #
-  2024 #
-  2026-01-12
-  2026-04-17
-  2026-04-26
-  2026-04-28
-  2026-06-04
-]]
-end
--- ) ( module workshop.mechs.cmdline.get_cmd_listdirs )
-
--- ( ( module workshop.table.clone )
-_G.package.preload['workshop.table.clone'] =
-function(...)
-local cloned = {}
-
-local clone
-clone =
-  function(node)
-    if (type(node) == 'table') then
-      if cloned[node] then
-        return cloned[node]
-      else
-        local result = {}
-        cloned[node] = result
-        for k, v in pairs(node) do
-          result[clone(k)] = clone(v)
+    local get_modules =
+      function(start_dir)
+        local Result = {}
+        get_modules(start_dir, '', Result)
+        return Result
+      end
+    local emit =
+      function(str)
+        io.write(str)
+        local newline = '\n'
+        if not string_ends_with(str, newline) then
+          io.write(newline)
         end
-        setmetatable(result, getmetatable(node))
+      end
+    local add_module_registration =
+      function(module_name, module_code)
+        local quoted_module_name = lua_quote_string(module_name)
+        local module_id = '( module ' .. module_name .. ' )'
+        emit('-- ( ' .. module_id)
+        emit('_G.package.preload[' .. quoted_module_name .. '] =')
+        emit('function(...)')
+        emit(module_code)
+        emit('end')
+        emit('-- ) ' .. module_id)
+        emit('')
+      end
+    local add_module_call =
+      function(module_name)
+        emit("require('" .. module_name .. "')")
+      end
+    local meld =
+      function(modules_dir, root_module)
+        local Modules = get_modules(modules_dir)
+        for _, Rec in ipairs(Modules) do
+          local module_name = Rec[1]
+          local module_code = Rec[2]
+          add_module_registration(module_name, module_code)
+        end
+        add_module_call(root_module)
+      end
+    do
+      local modules_dir = Config.modules_dir
+      local root_module = Config.root_module
+      if not modules_dir or not root_module then
+        io.write(usage_help)
+        return
+      end
+      modules_dir = add_dir_postfix(modules_dir)
+      meld(modules_dir, root_module)
+    end
+  end
+_G.package.preload['workshop.base'] =
+  function(...)
+    local split_name =
+      function(qualified_name)
+        local prefix_name_pattern = '^(.+%.)([^%.]+)$'
+        local prefix, name = qualified_name:match(prefix_name_pattern)
+        if not prefix then
+          prefix = ''
+          name = qualified_name
+          if not name:find('^([^%.]+)$') then
+            name = ''
+          end
+        end
+        return prefix, name
+      end
+    local unite_prefixes =
+      function(base_prefix, rel_prefix)
+        local init_base_prefix, init_rel_prefix = base_prefix, rel_prefix
+        local list_without_tail_pattern = '(.+%.)[^%.]-%.$'
+        local list_without_head_pattern = '[^%.]+%.(.+)$'
+        while rel_prefix:find('^%^%.') do
+          if (base_prefix == '') then
+            error(
+              ([[Link "%s" is outside of caller's prefix "%s".]]):format(
+                init_rel_prefix, init_base_prefix
+              )
+            )
+          end
+          base_prefix = base_prefix:match(list_without_tail_pattern) or ''
+          rel_prefix = rel_prefix:match(list_without_head_pattern) or ''
+        end
+        return base_prefix .. rel_prefix
+      end
+    local Names = {}
+    local depth = 1
+    local get_caller_prefix =
+      function()
+        local result = ''
+        if Names[depth] then
+          result = Names[depth].prefix
+        end
         return result
       end
-    else
-      return node
-    end
-  end
-
-return
-  function(node)
-    cloned = {}
-    return clone(node)
-  end
-
---[[
-* Metatables are shared, not cloned.
-
-* This code optimized for performance.
-
-  Main effect gave changing "is_table" to explicit type() check.
-]]
-end
--- ) ( module workshop.table.clone )
-
--- ( ( module workshop.table.new )
-_G.package.preload['workshop.table.new'] =
-function(...)
---[[
-  Clone table <base_obj>. Optionally override fields in clone with
-  fields from <overriden_params>.
-
-  Returns cloned table.
-]]
-
-local clone = request('clone')
-local patch = request('patch')
-
-return
-  function(base_obj, overriden_params)
-    assert_table(base_obj)
-    local result = clone(base_obj)
-    if is_table(overriden_params) then
-      patch(result, overriden_params)
-    end
-    return result
-  end
-end
--- ) ( module workshop.table.new )
-
--- ( ( module workshop.table.patch )
-_G.package.preload['workshop.table.patch'] =
-function(...)
--- Replace values to values from another table
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-05-18
-]]
-
---[[
-  Existing values are overwritten:
-    { a = 'A'}, { a = 'X' } -> { a = 'X' }
-
-  New values are not added:
-    { a = 'A'}, { b = 'B' } -> { a = 'A' }
-]]
-
--- Imports:
-local apply_table = request('apply_table')
-
-local patch =
-  function(Result, Additions)
-    assert_table(Result)
-
-    if is_nil(Additions) then
-      return
-    end
-
-    assert_table(Additions)
-
-    local Rules =
-      {
-        { HasA = true, HasB = true, Action = 'use_b' },
-        { HasA = false, HasB = true, Action = 'use_a' },
-      }
-
-    apply_table(Result, Additions, Rules)
-  end
-
--- Exports:
-return patch
-
---[[
-  2016 #
-  2024 # #
-  2025 #
-  2026-04-30
-]]
-end
--- ) ( module workshop.table.patch )
-
--- ( ( module workshop.table.apply_table )
-_G.package.preload['workshop.table.apply_table'] =
-function(...)
--- Apply values from another table to our table
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-04-30
-]]
-
---[[
-  Rules structure
-
-    List of records with following structure
-
-    {
-      HasA [b] -- value A is present
-      HasB [b] -- value B is present
-      Action [s] -- string with one of following values
-        use_a
-        use_b
-    }
-]]
-
-local use_a_str = 'use_a'
-local use_b_str = 'use_b'
-
---[[
-  Return action name considering given inputs and set of rules
-
-  If there is no rule for our condition,
-  action is "use_a" -- keep current value.
---]]
-local get_action =
-  function(has_a, has_b, Rules)
-    for _, Rule in ipairs(Rules) do
-      local is_same_signature =
-        (Rule.HasA == has_a) and (Rule.HasB == has_b)
-
-      if is_same_signature then
-        return Rule.Action
-      end
-    end
-
-    return use_a_str
-  end
-
--- Apply values to table A from table B following list of rules
-local apply_table
-apply_table =
-  function(A, B, Rules)
-    local a_type = type(A)
-    local b_type = type(B)
-
-    local Keys = {}
-    do
-      for a_key in pairs(A) do
-        Keys[a_key] = true
-      end
-      for b_key in pairs(B) do
-        Keys[b_key] = true
-      end
-    end
-
-    for key in pairs(Keys) do
-      local has_a = not is_nil(A[key])
-      local has_b = not is_nil(B[key])
-
-      local a_is_table = has_a and is_table(A[key])
-      local b_is_table = has_b and is_table(B[key])
-
-      if a_is_table and b_is_table then
-        apply_table(A[key], B[key], Rules)
-      else
-        local action = get_action(has_a, has_b, Rules)
-        if (action == use_a_str) then
-        elseif (action == use_b_str) then
-          A[key] = B[key]
+    local get_caller_name =
+      function()
+        local result = 'anonymous'
+        if Names[depth] then
+          result = Names[depth].prefix .. Names[depth].name
         end
+        return result
       end
-    end
-  end
-
-local check_rule =
-  function(Rule)
-    local has_a = is_boolean(Rule.HasA)
-    local has_b = is_boolean(Rule.HasB)
-
-    local action = Rule.Action
-    local is_known_action = (action == use_a_str) or (action == use_b_str)
-
-    return has_a, has_b, is_known_action
-  end
-
-local apply_table_root =
-  function(A, B, Rules)
-    assert_table(A)
-    assert_table(B)
-    assert_table(Rules)
-
-    -- Assert rules
-    for index, Rule in ipairs(Rules) do
-      local has_a, has_b, is_known_action = check_rule(Rule)
-
-      if not (has_a and has_b and is_known_action) then
-        local err_msg =
-          'Unsupported rule at index ' .. tostring(index)
-
-        error(err_msg, 2)
+    local push =
+      function(prefix, name)
+        depth = depth + 1
+        Names[depth] = {prefix = prefix, name = name}
       end
-    end
-
-    apply_table(A, B, Rules)
-  end
-
--- Export:
-return apply_table_root
-
---[[
-  2026-04-30
-]]
-end
--- ) ( module workshop.table.apply_table )
-
--- ( ( module workshop.file_system.directory.get_directories_list )
-_G.package.preload['workshop.file_system.directory.get_directories_list'] =
-function(...)
--- Return list of directory names in given directory
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-04-26
-]]
-
--- Imports:
-local get_cmd_listdirs = request('!.mechs.cmdline.get_cmd_listdirs')
-local get_program_output_lines = request('!.system.get_program_output_lines')
-
---[[
-  Return directory names in base directory as list of strings
-
-  Each list entry is string with directory name with
-  following properties:
-
-    * Starts with base directory prefix
-    * Does not contain "/"
-]]
-local get_dirs_list =
-  function(base_dir)
-    local cmd_get_dirs = get_cmd_listdirs(base_dir)
-
-    local Dirs = get_program_output_lines(cmd_get_dirs)
-
-    return Dirs
-  end
-
--- Export:
-return get_dirs_list
-
---[[
-  2017-08-11
-  2026-04-22
-  2026-04-26
-]]
-end
--- ) ( module workshop.file_system.directory.get_directories_list )
-
--- ( ( module workshop.file_system.directory.get_files_list )
-_G.package.preload['workshop.file_system.directory.get_files_list'] =
-function(...)
--- Return list of file names in given directory
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-04-22
-]]
-
--- Imports:
-local get_cmd_listfiles = request('!.mechs.cmdline.get_cmd_listfiles')
-local get_program_output_lines = request('!.system.get_program_output_lines')
-
---[[
-  Return file names in base directory as list of strings
-
-  Each entry will contain base directory prefix.
-]]
-local get_files_list =
-  function(base_dir)
-    local cmd_get_files = get_cmd_listfiles(base_dir)
-
-    local Result = get_program_output_lines(cmd_get_files)
-
-    return Result
-  end
-
--- Export:
-return get_files_list
-
---[[
-  2018-02-05
-  2026-04-22
-]]
-end
--- ) ( module workshop.file_system.directory.get_files_list )
-
--- ( ( module workshop.file_system.file.open )
-_G.package.preload['workshop.file_system.file.open'] =
-function(...)
--- Open file and return handle or throw an error
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-12
-]]
-
---[[
-  Contract is that this function returns file handle or explodes
-
-  No pesky ( nil error_msg ) from stock io.open().
-]]
-
--- Imports:
-local normalize_name = request('!.concepts.path_name.normalize')
-
-local default_mode = 'rb'
-
-local open_file =
-  function(pathname, mode)
-    assert_string(pathname)
-    assert(is_nil(mode) or is_string(mode))
-
-    pathname = normalize_name(pathname)
-    mode = mode or default_mode
-
-    local file, err_msg = io.open(pathname, mode)
-
-    if not file then
-      error(err_msg, 2)
-    end
-
-    return file
-  end
-
--- Export:
-return open_file
-
---[[
-  2016 #
-  2017 #
-  2026-05-04
-]]
-end
--- ) ( module workshop.file_system.file.open )
-
--- ( ( module workshop.file_system.file.to_string )
-_G.package.preload['workshop.file_system.file.to_string'] =
-function(...)
--- Return file's contents as string
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-05-30
-]]
-
--- Imports:
-local open_file = request('open')
-
-local load_file_contents =
-  function(pathname)
-    local File = open_file(pathname, 'rb')
-    local result = File:read('a')
-    File:close()
-
-    return result
-  end
-
--- Export:
-return load_file_contents
-
---[[
-  2016 # #
-  2019 #
-  2026-05-04
-  2026-05-30
-]]
-end
--- ) ( module workshop.file_system.file.to_string )
-
--- ( ( module workshop.string.ends_with )
-_G.package.preload['workshop.string.ends_with'] =
-function(...)
--- Return true if string ends with given string
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-04-26
-]]
-
--- Imports:
-local quote_regexp = request('!.lua.regexp.quote')
-
---[[
-  Returns true if string ends with given string
-
-  Magic characters are quoted.
-]]
-local ends_with =
-  function(base_str, postfix_str)
-    local postfix_pattern = quote_regexp(postfix_str) .. '$'
-
-    local start_pos = string.find(base_str, postfix_pattern)
-
-    local result = is_number(start_pos)
-
-    return result
-  end
-
--- Export:
-return ends_with
-
---[[
-  2026-04-23
-]]
-end
--- ) ( module workshop.string.ends_with )
-
--- ( ( module workshop.string.remove_prefix )
-_G.package.preload['workshop.string.remove_prefix'] =
-function(...)
--- Remove prefix from string
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-04-22
-]]
-
--- Imports:
-local quote_regexp = request('!.lua.regexp.quote')
-
---[[
-  Remove possible prefix string from string
-]]
-local remove_prefix =
-  function(base_str, prefix_str)
-    local prefix_regexp = '^' .. quote_regexp(prefix_str)
-    local result = string.gsub(base_str, prefix_regexp, '')
-    return result
-  end
-
--- Export:
-return remove_prefix
-
---[[
-  2026-04-22
-]]
-end
--- ) ( module workshop.string.remove_prefix )
-
--- ( ( module workshop.string.content_attributes )
-_G.package.preload['workshop.string.content_attributes'] =
-function(...)
-local has_control_chars =
-  function(s)
-    return s:find('%c') and true
-  end
-
-local has_backslashes =
-  function(s)
-    return s:find([[%\]]) and true
-  end
-
-local has_single_quotes =
-  function(s)
-    return s:find([[%']]) and true
-  end
-
-local has_double_quotes =
-  function(s)
-    return s:find([[%"]]) and true
-  end
-
-local is_nonascii =
-  function(s)
-    return s:find('[^%w%s_%p]')
-  end
-
-local has_newlines =
-  function(s)
-    return s:find('[\n\r]')
-  end
-
-return
-  {
-    has_control_chars = has_control_chars,
-    has_backslashes = has_backslashes,
-    has_single_quotes = has_single_quotes,
-    has_double_quotes = has_double_quotes,
-    is_nonascii = is_nonascii,
-    has_newlines = has_newlines,
-  }
-
---[[
-  2016-09
-  2017-02
-  2017-08
-  2024-11
-]]
-end
--- ) ( module workshop.string.content_attributes )
-
--- ( ( module workshop.string.split )
-_G.package.preload['workshop.string.split'] =
-function(...)
--- Split string into pieces
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-05-04
-]]
-
--- Imports:
-local ends_with = request('!.string.ends_with')
-local quote_regexp = request('!.lua.regexp.quote')
-local add_to_list = request('!.concepts.list.add_item')
-
---[[
-  Split delimited string into list
-
-  ( 'a/b' '/' ) -> ( 'a' 'b' )
-  ( 'a/' '/' ) -> ( 'a' )
-
-  String is always treated as it ends on delimiter.
-
-  Cases/examples:
-
-    ('', '') ->  ( '' )
-    ('a', '') ->  ( 'a' )
-    ('a', '/') -> ( 'a' )
-    ('/', '/') ->  ( '' )
-    ('//', '/') -> ( '' '' )
-]]
-local split_string =
-  function(str, delimiter)
-    assert_string(str)
-    assert_string(delimiter)
-
-    -- Special case: empty delimiter
-    if (delimiter == '') then
-      -- Return list with source string
-      return { str }
-    end
-
-    if not ends_with(str, delimiter) then
-      str = str .. delimiter
-    end
-
-    local Result = { }
-
-    local item_capture = '(.-)' .. quote_regexp(delimiter) .. '()'
-
-    local start_pos
-    local end_pos
-    local item_str
-
-    start_pos = 1
-
-    while true do
-      start_pos, end_pos, item_str =
-        string.find(str, item_capture, start_pos)
-
-      if not start_pos then break end
-
-      add_to_list(Result, item_str)
-
-      start_pos = end_pos + 1
-    end
-
-    return Result
-  end
-
--- Export:
-return split_string
-
---[[
-  2016 # #
-  2026-04 # #
-]]
-end
--- ) ( module workshop.string.split )
-
--- ( ( module workshop.convert.lines_from_str )
-_G.package.preload['workshop.convert.lines_from_str'] =
-function(...)
--- Convert string to lines
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-05-29
-]]
-
--- Imports:
-local split_string = request('!.string.split')
-
-local string_to_lines =
-  function(str)
-    local newline = '\n'
-
-    return split_string(str, newline)
-  end
-
--- Exports:
-return string_to_lines
-
---[[
-  2024 # # #
-  2026-05-04
-]]
-end
--- ) ( module workshop.convert.lines_from_str )
-
--- ( ( module workshop.convert.file_to_str )
-_G.package.preload['workshop.convert.file_to_str'] =
-function(...)
--- Load file as string
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-05-30
-]]
-
--- Export:
-return request('!.file_system.file.to_string')
-
---[[
-  // similar code was at 201x's
-  2026-04-27
-  2026-05-30
-]]
-end
--- ) ( module workshop.convert.file_to_str )
-
--- ( ( module workshop.concepts.lua.NumberTypeNames )
-_G.package.preload['workshop.concepts.lua.NumberTypeNames'] =
-function(...)
--- Return list of numeric type names
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-16
-]]
-
-local NumberTypeNames =
-  {
-    'integer',
-    'float',
-  }
-
--- Export:
-return NumberTypeNames
-
---[[
-  2024-03-02
-  2026-06-16
-]]
-end
--- ) ( module workshop.concepts.lua.NumberTypeNames )
-
--- ( ( module workshop.concepts.lua.TypeNames )
-_G.package.preload['workshop.concepts.lua.TypeNames'] =
-function(...)
--- List with names of all Lua data types
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-16
-]]
-
-local TypeNames =
-  {
-    'nil',
-    'boolean',
-    'number',
-    'string',
-    'function',
-    'thread',
-    'userdata',
-    'table',
-  }
-
--- Export:
-return TypeNames
-
---[[
-  2018-02
-  2026-06-16
-]]
-end
--- ) ( module workshop.concepts.lua.TypeNames )
-
--- ( ( module workshop.concepts.lua.quote_string )
-_G.package.preload['workshop.concepts.lua.quote_string'] =
-function(...)
--- Decision-making function how to represent data in Lua string syntax
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-01-12
-]]
-
-local quote_escaped = request('quote_string.linear')
-local quote_intact = request('quote_string.intact')
-local quote_aggressive = request('quote_string.dump')
-
-local content_funcs = request('!.string.content_attributes')
-local has_control_chars = content_funcs.has_control_chars
-local has_backslashes = content_funcs.has_backslashes
-local has_single_quotes = content_funcs.has_single_quotes
-local has_double_quotes = content_funcs.has_double_quotes
-local has_newlines = content_funcs.has_newlines
-
-local binary_entities_lengths =
-  {
-    [1] = true,
-    [2] = true,
-    [4] = true,
-    [8] = true,
-    [16] = true,
-  }
-
-return
-  function(s)
-    assert_string(s)
-
-    local quote_func = quote_escaped
-
-    if binary_entities_lengths[#s] and has_control_chars(s) then
-      quote_func = quote_aggressive
-    elseif
-      has_backslashes(s) or
-      has_newlines(s) or
-      (has_single_quotes(s) and has_double_quotes(s))
-    then
-      quote_func = quote_intact
-    end
-
-    local result = quote_func(s)
-    return result
-  end
-
---[[
-  2016-09
-  2017-08
-  2024-11
-  2026-01-12
-]]
-end
--- ) ( module workshop.concepts.lua.quote_string )
-
--- ( ( module workshop.concepts.lua.quote_string.intact )
-_G.package.preload['workshop.concepts.lua.quote_string.intact'] =
-function(...)
--- Quote string in long quotes
-
--- Last mod.: 2024-11-19
-
---[==[
-  Long quotes
-
-  Long quotes is multi-character quotes in Lua. String data inside them
-  are not processed. So no need to worry about quoting some "special"
-  characters.
-
-  That's all the same:
-
-    > s = [[
-    Hello!]]
-    > s = [[Hello!]]
-    > s = [=[Hello!]=]
-]==]
-
-local has_newlines = request('!.string.content_attributes').has_newlines
-
-return
-  function(s)
-    assert_string(s)
-
-    -- (1)
-    s = s .. ']'
-
-    local eq_chunk = ''
-    local postfix
-    while true do
-      postfix = ']' .. eq_chunk .. ']'
-      if not s:find(postfix, 1, true) then
-        break
+    local pop =
+      function()
+        depth = depth - 1
       end
-      eq_chunk = eq_chunk .. '='
-    end
-
-    local prefix = '[' .. eq_chunk .. '['
-
-    -- (2)
-    local first_char = s:sub(1, 1)
-    if
-      (first_char == '\x0D') or
-      (first_char == '\x0A')
-    then
-      prefix = prefix .. first_char
-    end
-
-    -- (3)
-    if has_newlines(s) then
-      prefix = prefix .. '\x0A'
-    end
-
-    return prefix .. s .. eq_chunk .. ']'
-  end
-
---[===[
-  [1] Quoted result string will have following structure:
-
-    "[" "="^N "[" ["\n"] s "]" "="^N "]"
-
-    We may safely concatenate "]" to <s> before determining <N>.
-    This is done to avoid following cases:
-
-      s     | unpatched   |  patched
-      ------+-------------+--------------
-      "]"   | "[[]]]"     | "[=[]]=]"
-      "]]=" | "[=[]]=]=]" | "[==[]]=]==]"
-
-    Case pointed by Roberto Ierusalimschy 2018-12-14 in Lua Mail
-    List.
-
-  [2] Heading newline dropped from long string quote. So we need
-    duplicate it to preserve second copy. Before it all variants
-    of newlines are converted to 0x0A.
-
-    Tricky case here is if we have 0x0D we cant add 0x0A or it still
-    be interpreted as one newline.
-
-    Nice workaround is duplicate first byte of newline:
-
-      0D    | 0D 0D    | \
-      0A    | 0A 0A    |   still two line
-      0D 0A | 0D 0D 0A |   delimiters!
-      0A 0D | 0A 0A 0D | /
-
-    Case and solution pointed by Andrew Gierth 2018-12-15 in Lua
-    Mail List.
-
-  [3]
-    If string is multiline like "Hey\n  buddy!\n" then we want to
-    represent it as
-      > [[
-      > Hey
-      >   buddy!
-      > ]]
-
-    Not as
-      > [[Hey
-      >   buddy!
-      > ]]
-
-    For the sake of readability.
-  ]=]
-
-]===]
-
---[[
-  2017-03
-  2018-12
-  2024-11
-]]
-end
--- ) ( module workshop.concepts.lua.quote_string.intact )
-
--- ( ( module workshop.concepts.lua.quote_string.linear )
-_G.package.preload['workshop.concepts.lua.quote_string.linear'] =
-function(...)
-local quote_char = request('quote_char')
-local custom_quotes = request('custom_quotes')
-
---[[
-  [1]
-    I do not want to remember <custom_quotes> mapping (to understand
-    that "\f" in output means ASCII code 0x0C. Also I do not like when
-    "\" maps to "\\", I prefer "\x5c". Without using <custom_quote>
-    table you get longer but easier to understand data representation.
-]]
-return
-  function(s)
-    local result = s
-    --(1)
-    -- result = result:gsub([[\]], custom_quotes['\\'])
-    result = result:gsub([[\]], quote_char)
-    -- result = result:gsub('[%c]', custom_quotes)
-    result = result:gsub('[%c]', quote_char)
-    --/
-
-    local cnt_q1 = 0
-    for i in result:gmatch("'") do
-      cnt_q1 = cnt_q1 + 1
-    end
-    local cnt_q2 = 0
-    for i in result:gmatch('"') do
-      cnt_q2 = cnt_q2 + 1
-    end
-    if (cnt_q1 <= cnt_q2) then
-      result = "'" .. result:gsub("'", custom_quotes["'"]) .. "'"
-    else
-      result = '"' .. result:gsub('"', custom_quotes['"']) .. '"'
-    end
-    return result
-  end
-end
--- ) ( module workshop.concepts.lua.quote_string.linear )
-
--- ( ( module workshop.concepts.lua.quote_string.dump )
-_G.package.preload['workshop.concepts.lua.quote_string.dump'] =
-function(...)
---[[
-  Quote given string as by substituting all characters to their
-  hex values.
-
-  Handy for representing binary numbers:
-    '\xB2\x7F\x02\xEE' has more sense than '²\x7F\x02î'
-]]
-
-local quote_char = request('quote_char')
-
-return
-  function(s)
-    assert_string(s)
-    return "'" .. s:gsub('.', quote_char) .. "'"
-  end
-end
--- ) ( module workshop.concepts.lua.quote_string.dump )
-
--- ( ( module workshop.concepts.lua.quote_string.quote_char )
-_G.package.preload['workshop.concepts.lua.quote_string.quote_char'] =
-function(...)
---[[
-  Return string with escaped hex byte for given string with byte.
-
-  So for ' ' it will return '\x20'.
-
-  This function intended for use as gsub() match handler.
-]]
-
-return
-  function(c)
-    return ([[\x%02X]]):format(c:byte(1, 1))
-  end
-end
--- ) ( module workshop.concepts.lua.quote_string.quote_char )
-
--- ( ( module workshop.concepts.lua.quote_string.custom_quotes )
-_G.package.preload['workshop.concepts.lua.quote_string.custom_quotes'] =
-function(...)
-return
-  {
-    ['\x07'] = [[\a]],
-    ['\x08'] = [[\b]],
-    ['\x09'] = [[\t]],
-    ['\x0a'] = [[\n]],
-    ['\x0b'] = [[\v]],
-    ['\x0c'] = [[\f]],
-    ['\x0d'] = [[\r]],
-    ['"'] = [[\"]],
-    ["'"] = [[\']],
-    ['\\'] = [[\\]],
-  }
-end
--- ) ( module workshop.concepts.lua.quote_string.custom_quotes )
-
--- ( ( module workshop.concepts.shell.quote )
-_G.package.preload['workshop.concepts.shell.quote'] =
-function(...)
--- Encode string to shell
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-09
-]]
-
---[[
-  Examples
-
-    -> ''
-    ' -> \'
-    a# -> a#
-    #a -> '#a'
-    a b -> 'a b'
-]]
-
--- Imports:
-local list_to_str = request('!.concepts.list.to_string')
-local split_string = request('!.string.split')
-local add_to_list = request('!.concepts.list.add_item')
-
-local special_chars_regexp
-local starts_with_comment_regexp
-do
-  -- Imports:
-  local quote_regexp = request('!.lua.regexp.quote')
-
-  do
-    -- Imports:
-    local SpecialChars = request('quote.SpecialChars')
-
-    local special_chars_str = list_to_str(SpecialChars)
-
-    special_chars_regexp = '[' .. quote_regexp(special_chars_str) .. ']'
-  end
-
-  do
-    -- Imports:
-    local SpaceChars = request('quote.SpaceChars')
-
-    local space_chars_str = list_to_str(SpaceChars)
-
-    local space_chars_regexp = '[' .. quote_regexp(space_chars_str) .. ']'
-
-    local comment_char = '#'
-
-    starts_with_comment_regexp = '^' .. space_chars_regexp .. '+' .. comment_char
-  end
-end
-
-local needs_quoting =
-  function(str)
-    return
-      (str == '') or
-      not is_nil(string.find(str, special_chars_regexp)) or
-      not is_nil(string.find(str, starts_with_comment_regexp))
-  end
-
-local quote
-quote =
-  function(str)
-    --[[
-      We're quoting only when it's needed
-
-      F.e. "a;b" is quoted. But "a=b" is not.
-
-
-      We're using single-quotes
-
-      Happy case is when string does not contain "'".
-      Then we just surround string with "'".
-
-      If string contains "'" we split it by "'",
-      quote parts, and glue with escaped "'".
-
-
-      "'" can be represented as [\'] or as ["'"] or as [\039] or as ...
-
-      We'll use [\'].
-    ]]
-
-    assert_string(str)
-
-    if not needs_quoting(str) then return str end
-
-    local single_quote = "'"
-
-    if not string.find(str, single_quote) then
-      return single_quote .. str .. single_quote
-    end
-
-    str = str .. single_quote
-
-    local RawItems = split_string(str, single_quote)
-    local Items = { }
-
-    for _, item in ipairs(RawItems) do
-      local quoted_item
-      if (item == '') then
-        -- Empty string is part here. No need to quote it
-        quoted_item = ''
-      else
-        quoted_item = quote(item)
+    local Dependencies_Map = {}
+    local add_dependency =
+      function(src_name, dest_name)
+        Dependencies_Map[src_name] = Dependencies_Map[src_name] or {}
+        Dependencies_Map[src_name][dest_name] = true
       end
-
-      add_to_list(Items, quoted_item)
-    end
-
-    return list_to_str(Items, [[\]] .. single_quote)
-  end
-
-return quote
-
---[[
-  2026-01-12
-  2026-06-09
-]]
-end
--- ) ( module workshop.concepts.shell.quote )
-
--- ( ( module workshop.concepts.shell.execute )
-_G.package.preload['workshop.concepts.shell.execute'] =
-function(...)
--- Execute shell command
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-05-30
-]]
-
---[[
-  Input
-
-    [s] command -- Shell command to execute
-
-  Output
-
-    [t]
-      [b] is_aborted -- true in case of aborted execution
-      [i] result_code -- Return code in case of normal ending.
-        Termination code (signal number) in case of aborted ending.
-      [s] output -- Program output
-      [s] errors -- Program errors
-    }
-]]
-
--- Imports:
-local file_to_str = request('!.convert.file_to_str')
-local get_execute_command =
-  request('!.mechs.cmdline.get_cmd_execute_with_redirects')
-
---[[
-  Execute shell command and capture results
-
-  Executes given string as shell (OS-dependent) command.
-  Captures termination code / return code, output and errors.
-]]
-local execute_shell_command =
-  function(command)
-    local output_filename = os.tmpname()
-    local error_filename = os.tmpname()
-
-    local shell_command =
-      get_execute_command(
-        command, output_filename, error_filename
-      )
-
-    local _, result_type_code, result_code = os.execute(shell_command)
-
-    local Result = { }
-
-    if (result_type_code == 'exit') then
-      Result.is_aborted = false
-    elseif (result_type_code == 'signal') then
-      Result.is_aborted = true
-    end
-    Result.result_code = result_code
-    Result.output = file_to_str(output_filename)
-    Result.error = file_to_str(error_filename)
-
-    os.remove(output_filename)
-    os.remove(error_filename)
-
-    return Result
-  end
-
--- Export:
-return execute_shell_command
-
---[[
-  2026-04-17
-]]
-end
--- ) ( module workshop.concepts.shell.execute )
-
--- ( ( module workshop.concepts.shell.quote.SpecialChars )
-_G.package.preload['workshop.concepts.shell.quote.SpecialChars'] =
-function(...)
--- Context-free non-ordinary characters in shell
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-12
-]]
-
--- Imports:
-local SpaceChars = request('SpaceChars')
-local add_list = request('!.concepts.list.add_list')
-
-local SpecialChars =
-  {
-    -- '!',
-    '"',
-    -- '#',
-    '$',
-    -- '%',
-    '&',
-    "'",
-    '(',
-    ')',
-    '*',
-    -- '+',
-    -- ',',
-    -- '-',
-    -- '.',
-    -- '/',
-    -- ':',
-    ';',
-    '<',
-    -- '=',
-    '>',
-    -- '?',
-    -- '@',
-    '[',
-    [[\]],
-    ']',
-    '^',
-    -- '_',
-    '`',
-    '{',
-    '|',
-    '}',
-    -- '~',
-  }
-
-add_list(SpecialChars, SpaceChars)
-
--- Export:
-return SpecialChars
-
---[[
-  2026-06-09
-  2026-06-12
-]]
-end
--- ) ( module workshop.concepts.shell.quote.SpecialChars )
-
--- ( ( module workshop.concepts.shell.quote.SpaceChars )
-_G.package.preload['workshop.concepts.shell.quote.SpaceChars'] =
-function(...)
--- Whitespace characters in shell
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-09
-]]
-
--- Imports:
-
---[[
-  Whitespaces are context-free special characters
-
-  Also they are used to apply special meaning to
-  context-dependent "#" comment character:
-
-    If the first non-space character in string is "#" then
-    next characters till newline is comment.
-
-    So " # c <nl>b" is comment " c " and token "b".
-]]
-
---[[
-  Because whitespaces serve several roles they live in separate
-  module.
-]]
-
-local SpaceChars =
-  {
-    '\009',
-    '\010',
-    ' ',
-  }
-
--- Export:
-return SpaceChars
-
---[[
-  2026-06-09
-]]
-end
--- ) ( module workshop.concepts.shell.quote.SpaceChars )
-
--- ( ( module workshop.concepts.list.to_string )
-_G.package.preload['workshop.concepts.list.to_string'] =
-function(...)
--- Concatenate list of string values to string
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-05-29
-]]
-
-local to_string =
-  function(List, separator_str)
-    assert_table(List)
-
-    separator_str = separator_str or ''
-    assert_string(separator_str)
-
-    -- Meh, in Lua it's simple
-    return table.concat(List, separator_str)
-  end
-
--- Export:
-return to_string
-
---[[
-  2024 # #
-  2026-05-29
-]]
-end
--- ) ( module workshop.concepts.list.to_string )
-
--- ( ( module workshop.concepts.list.add_item )
-_G.package.preload['workshop.concepts.list.add_item'] =
-function(...)
--- Add item to list
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-05-04
-]]
-
-local add_item =
-  function(OurList, item)
-    table.insert(OurList, item)
-  end
-
--- Export:
-return add_item
-
---[[
-  2026-05-04
-]]
-end
--- ) ( module workshop.concepts.list.add_item )
-
--- ( ( module workshop.concepts.list.add_list )
-_G.package.preload['workshop.concepts.list.add_list'] =
-function(...)
--- Add another list to our list
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-05-02
-]]
-
--- Imports:
-
-local add_list =
-  function(OurList, AnotherList)
-    table.move(AnotherList, 1, #AnotherList, #OurList + 1, OurList)
-  end
-
--- Export:
-return add_list
-
---[[
-  2026-05-02
-]]
-end
--- ) ( module workshop.concepts.list.add_list )
-
--- ( ( module workshop.concepts.words.to_string )
-_G.package.preload['workshop.concepts.words.to_string'] =
-function(...)
--- Represent words as string
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-05-29
-]]
-
--- Imports:
-local list_to_string = request('!.concepts.list.to_string')
-
-local to_string =
-  function(Words)
-    return list_to_string(Words, ' ')
-  end
-
--- Export:
-return to_string
-
---[[
-  2026-04-15
-]]
-end
--- ) ( module workshop.concepts.words.to_string )
-
--- ( ( module workshop.concepts.FilesLister.RemoveBaseDirPrefix )
-_G.package.preload['workshop.concepts.FilesLister.RemoveBaseDirPrefix'] =
-function(...)
--- Remove base directory prefix from list of pathnames
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-04
-]]
-
--- Imports:
-local remove_prefix = request('!.string.remove_prefix')
-
-local RemoveBaseDirPrefix =
-  function(Me, FileNames)
-    local base_dir = Me.BaseDir
-
-    for i = 1, #FileNames do
-      FileNames[i] = remove_prefix(FileNames[i], base_dir)
-    end
-
-    for i = #FileNames, 1, -1 do
-      if (FileNames[i] == '') then
-        table.remove(FileNames, i)
-      end
-    end
-  end
-
--- Export:
-return RemoveBaseDirPrefix
-
---[[
-  2026-04-22
-  2026-06-04
-]]
-end
--- ) ( module workshop.concepts.FilesLister.RemoveBaseDirPrefix )
-
--- ( ( module workshop.concepts.FilesLister.GetFiles )
-_G.package.preload['workshop.concepts.FilesLister.GetFiles'] =
-function(...)
--- Return list of files
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-04-22
-]]
-
--- Imports:
-local get_files_list = request('!.file_system.directory.get_files_list')
-
---[[
-  Return file names in base directory as list of strings
-]]
-local GetFilesList =
-  function(Me)
-    local FileNames = get_files_list(Me.BaseDir)
-
-    Me:RemoveBaseDirPrefix(FileNames)
-
-    return FileNames
-  end
-
--- Export:
-return GetFilesList
-
---[[
-  2017-08-11
-  2026-04-22
-]]
-end
--- ) ( module workshop.concepts.FilesLister.GetFiles )
-
--- ( ( module workshop.concepts.FilesLister.GetBaseDirectory )
-_G.package.preload['workshop.concepts.FilesLister.GetBaseDirectory'] =
-function(...)
--- Return Base Directory string
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-04-22
-]]
-
---[[
-  That's a design burden: caller can use SetBaseDirectory but to
-  get base directory it has to read field "BaseDir".
-
-  Caller should not remember this "BaseDir" name. It's for internal
-  usage and can be changed.
-]]
-
--- Get base directory
-local GetBaseDir =
-  function(Me)
-    return Me.BaseDir
-  end
-
--- Export:
-return GetBaseDir
-
---[[
-  2026-04-22
-]]
-end
--- ) ( module workshop.concepts.FilesLister.GetBaseDirectory )
-
--- ( ( module workshop.concepts.FilesLister.SetBaseDirectory )
-_G.package.preload['workshop.concepts.FilesLister.SetBaseDirectory'] =
-function(...)
--- Set base directory for lister
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-16
-]]
-
--- Imports:
-local add_dir_postfix = request('!.concepts.path_name.add_dir_postfix')
-local normalize_name = request('!.concepts.path_name.normalize')
-
-local SetBaseDir =
-  function(Me, base_dir)
-    assert_string(base_dir)
-
-    base_dir = add_dir_postfix(base_dir)
-    base_dir = normalize_name(base_dir)
-
-    Me.BaseDir = base_dir
-  end
-
--- Export:
-return SetBaseDir
-
---[[
-  2017-08-11
-  2026-04-22
-  2026-04-26
-]]
-end
--- ) ( module workshop.concepts.FilesLister.SetBaseDirectory )
-
--- ( ( module workshop.concepts.FilesLister.GetDirectories )
-_G.package.preload['workshop.concepts.FilesLister.GetDirectories'] =
-function(...)
--- Return list of directories
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-04-26
-]]
-
--- Imports:
-local get_dirs_list = request('!.file_system.directory.get_directories_list')
-
---[[
-  Return directory names in base directory as list of strings
-]]
-local GetDirectories =
-  function(Me)
-    local Dirs = get_dirs_list(Me.BaseDir)
-
-    Me:RemoveBaseDirPrefix(Dirs)
-
-    return Dirs
-  end
-
--- Export:
-return GetDirectories
-
---[[
-  2017-08-11
-  2026-04-22
-]]
-end
--- ) ( module workshop.concepts.FilesLister.GetDirectories )
-
--- ( ( module workshop.concepts.FilesLister.Interface )
-_G.package.preload['workshop.concepts.FilesLister.Interface'] =
-function(...)
--- Files/directories lister
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-04-22
-]]
-
-return
-  {
-    -- Config
-    SetBaseDirectory = request('SetBaseDirectory'),
-    GetBaseDirectory = request('GetBaseDirectory'),
-
-    -- Run
-    GetFiles = request('GetFiles'),
-    GetDirectories = request('GetDirectories'),
-
-    -- Internals
-    BaseDir = './',
-    RemoveBaseDirPrefix = request('RemoveBaseDirPrefix'),
-  }
-
---[[
-  2017-08-11
-  2026-04-22
-]]
-end
--- ) ( module workshop.concepts.FilesLister.Interface )
-
--- ( ( module workshop.concepts.path_name.pathname_to_str )
-_G.package.preload['workshop.concepts.path_name.pathname_to_str'] =
-function(...)
--- Compile list of names to directory path
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-12
-]]
-
--- Imports:
-local list_to_str = request('!.concepts.list.to_string')
-
-local names_sep = '/'
-
-local pathname_to_str =
-  function(Pathname)
-    return list_to_str(Pathname, names_sep)
-  end
-
--- Export:
-return pathname_to_str
-
---[[
-  2026-06-12
-]]
-end
--- ) ( module workshop.concepts.path_name.pathname_to_str )
-
--- ( ( module workshop.concepts.path_name.pathname_from_str )
-_G.package.preload['workshop.concepts.path_name.pathname_from_str'] =
-function(...)
--- Parse pathname string to list of names
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-12
-]]
-
---[[
-  Contract
-
-  * Empty pathname string is not accepted
-  * Returned list always contains at least two items
-  * If pathname is absolute then first item is ""
-  * If pathname is directory then last item is ""
-]]
-
--- Imports:
-local split_string = request('!.string.split')
-
-local sep = '/'
-local empty = ''
-local self_dir = '.'
-local upper_dir = '..'
-
---[[
-  Parses string with Unix pathname. Returns table
-]]
-local pathname_from_str =
-  function(path_name)
-    assert_string(path_name)
-    assert(path_name ~= '', 'Please pass not empty path_name')
-
-    path_name = path_name .. sep
-    local Path = split_string(path_name, sep)
-
-    do
-      local index = 2
-      local current_item
-      while (index <= #Path - 1) do
-        current_item = Path[index]
-        if
-          (current_item == empty) or
-          (current_item == self_dir)
-        then
-          table.remove(Path, index)
+    local base_prefix = split_name((...))
+    local get_require_name =
+      function(qualified_name)
+        local caller_prefix
+        local is_absolute_name = (qualified_name:sub(1, 2) == '!.')
+        if is_absolute_name then
+          qualified_name = qualified_name:sub(3)
+          caller_prefix = base_prefix
         else
-          index = index + 1
+          caller_prefix = get_caller_prefix()
+        end
+        local prefix, name = split_name(qualified_name)
+        prefix = unite_prefixes(caller_prefix, prefix)
+        return prefix .. name, prefix, name
+      end
+    local request =
+      function(qualified_name)
+        local src_name = get_caller_name()
+        local require_name, prefix, name = get_require_name(qualified_name)
+        push(prefix, name)
+        local dest_name = get_caller_name()
+        add_dependency(src_name, dest_name)
+        local Results = table.pack(require(require_name))
+        pop()
+        return table.unpack(Results)
+      end
+    local is_first_run = (_G.request == nil)
+    if is_first_run then
+      _G.request = request
+      _G.get_dependencies =
+        function()
+          return Dependencies_Map
+        end
+      _G.get_base_prefix =
+        function()
+          return base_prefix
+        end
+      _G.get_require_name = get_require_name
+      local our_require_name = (...)
+      push('', our_require_name)
+      request('!.system.install_is_functions')()
+      request('!.system.install_assert_functions')()
+      _G.new = request('!.table.new')
+      pop()
+    end
+  end
+_G.package.preload['workshop.system.install_is_functions'] =
+  function(...)
+    local TypeNames = request('!.concepts.lua.TypeNames')
+    local NumberTypeNames = request('!.concepts.lua.NumberTypeNames')
+    local type_is =
+      function(type_name)
+        return
+          function(val)
+            return (type(val) == type_name)
+          end
+      end
+    local number_is =
+      function(type_name)
+        return
+          function(val)
+            if not is_number(val) then
+              return false
+            end
+            return (math.type(val) == type_name)
+          end
+      end
+    local install_is_functions =
+      function()
+        for _, type_name in ipairs(TypeNames) do
+          _G['is_' .. type_name] = type_is(type_name)
+        end
+        for _, math_type_name in ipairs(NumberTypeNames) do
+          _G['is_' .. math_type_name] = number_is(math_type_name)
         end
       end
-    end
-
-    setmetatable(
-      Path,
-      {
-        __index =
-          function(table, key)
-            if (key == 'first_node') then
-              return table[1]
-            elseif (key == 'last_node') then
-              return table[#table]
+    return install_is_functions
+  end
+_G.package.preload['workshop.system.get_program_output_lines'] =
+  function(...)
+    local shell_execute = request('!.concepts.shell.execute')
+    local lines_from_str = request('!.convert.lines_from_str')
+    local get_program_output_lines =
+      function(shell_cmd)
+        assert_string(shell_cmd)
+        local ExecResult = shell_execute(shell_cmd)
+        return lines_from_str(ExecResult.output)
+      end
+    return get_program_output_lines
+  end
+_G.package.preload['workshop.system.install_assert_functions'] =
+  function(...)
+    local TypeNames = request('!.concepts.lua.TypeNames')
+    local NumberTypeNames = request('!.concepts.lua.NumberTypeNames')
+    local spawn_assert_func =
+      function(type_name)
+        local checker = _G['is_' .. type_name]
+        assert(checker)
+        return
+          function(val)
+            if not checker(val) then
+              local err_msg = string.format('assert_%s(%s)', type_name, tostring(val))
+              error(err_msg)
             end
-          end,
+          end
+      end
+    local install_assert_funcs =
+      function()
+        for _, type_name in ipairs(TypeNames) do
+          _G['assert_' .. type_name] = spawn_assert_func(type_name)
+        end
+        for _, number_type_name in ipairs(NumberTypeNames) do
+          _G['assert_' .. number_type_name] = spawn_assert_func(number_type_name)
+        end
+      end
+    return install_assert_funcs
+  end
+_G.package.preload['workshop.lua.regexp.magic_chars'] =
+  function(...)
+    return '^$()[]%.?*+-'
+  end
+_G.package.preload['workshop.lua.regexp.magic_char_pattern'] =
+  function(...)
+    local magic_chars = request('magic_chars')
+    local magic_char_patttern = '[' .. magic_chars:gsub('.', '%%%0') .. ']'
+    return magic_char_patttern
+  end
+_G.package.preload['workshop.lua.regexp.quote'] =
+  function(...)
+    local magic_char_pattern = request('magic_char_pattern')
+    return
+      function(s)
+        return s:gsub(magic_char_pattern, '%%%0')
+      end
+  end
+_G.package.preload['workshop.mechs.cmdline.get_cmd_listfiles'] =
+  function(...)
+    local normalize = request('!.concepts.path_name.normalize')
+    local quote = request('!.concepts.shell.quote')
+    local glue_words = request('!.concepts.words.to_string')
+    return
+      function(dir_name)
+        local Command = {'find', quote(normalize(dir_name)), '-maxdepth', '1', '-type', 'f'}
+        return glue_words(Command)
+      end
+  end
+_G.package.preload['workshop.mechs.cmdline.get_cmd_execute_with_redirects'] =
+  function(...)
+    local normalize = request('!.concepts.path_name.normalize')
+    local quote = request('!.concepts.shell.quote')
+    local glue_words = request('!.concepts.words.to_string')
+    return
+      function(orig_command, output_file_name, errors_file_name)
+        local Command =
+          {
+            'sh',
+            '-c',
+            quote(orig_command),
+            '1>' .. quote(normalize(output_file_name)),
+            '2>' .. quote(normalize(errors_file_name)),
+          }
+        return glue_words(Command)
+      end
+  end
+_G.package.preload['workshop.mechs.cmdline.get_cmd_listdirs'] =
+  function(...)
+    local normalize = request('!.concepts.path_name.normalize')
+    local quote = request('!.concepts.shell.quote')
+    local glue_words = request('!.concepts.words.to_string')
+    return
+      function(dir_name)
+        local Command =
+          {'find', quote(normalize(dir_name)), '-maxdepth', '1', '-mindepth', '1', '-type', 'd'}
+        return glue_words(Command)
+      end
+  end
+_G.package.preload['workshop.table.clone'] =
+  function(...)
+    local cloned = {}
+    local clone
+    clone =
+      function(node)
+        if (type(node) == 'table') then
+          if cloned[node] then
+            return cloned[node]
+          else
+            local result = {}
+            cloned[node] = result
+            for k, v in pairs(node) do
+              result[clone(k)] = clone(v)
+            end
+            setmetatable(result, getmetatable(node))
+            return result
+          end
+        else
+          return node
+        end
+      end
+    return
+      function(node)
+        cloned = {}
+        return clone(node)
+      end
+  end
+_G.package.preload['workshop.table.new'] =
+  function(...)
+    local clone = request('clone')
+    local patch = request('patch')
+    return
+      function(base_obj, overriden_params)
+        assert_table(base_obj)
+        local result = clone(base_obj)
+        if is_table(overriden_params) then
+          patch(result, overriden_params)
+        end
+        return result
+      end
+  end
+_G.package.preload['workshop.table.patch'] =
+  function(...)
+    local apply_table = request('apply_table')
+    local patch =
+      function(Result, Additions)
+        assert_table(Result)
+        if is_nil(Additions) then
+          return
+        end
+        assert_table(Additions)
+        local Rules =
+          {
+            {HasA = true, HasB = true, Action = 'use_b'},
+            {HasA = false, HasB = true, Action = 'use_a'},
+          }
+        apply_table(Result, Additions, Rules)
+      end
+    return patch
+  end
+_G.package.preload['workshop.table.apply_table'] =
+  function(...)
+    local use_a_str = 'use_a'
+    local use_b_str = 'use_b'
+    local get_action =
+      function(has_a, has_b, Rules)
+        for _, Rule in ipairs(Rules) do
+          local is_same_signature = (Rule.HasA == has_a) and (Rule.HasB == has_b)
+          if is_same_signature then
+            return Rule.Action
+          end
+        end
+        return use_a_str
+      end
+    local apply_table
+    apply_table =
+      function(A, B, Rules)
+        local a_type = type(A)
+        local b_type = type(B)
+        local Keys = {}
+        do
+          for a_key in pairs(A) do
+            Keys[a_key] = true
+          end
+          for b_key in pairs(B) do
+            Keys[b_key] = true
+          end
+        end
+        for key in pairs(Keys) do
+          local has_a = not is_nil(A[key])
+          local has_b = not is_nil(B[key])
+          local a_is_table = has_a and is_table(A[key])
+          local b_is_table = has_b and is_table(B[key])
+          if a_is_table and b_is_table then
+            apply_table(A[key], B[key], Rules)
+          else
+            local action = get_action(has_a, has_b, Rules)
+            if (action == use_a_str) then
+            elseif (action == use_b_str) then
+              A[key] = B[key]
+            end
+          end
+        end
+      end
+    local check_rule =
+      function(Rule)
+        local has_a = is_boolean(Rule.HasA)
+        local has_b = is_boolean(Rule.HasB)
+        local action = Rule.Action
+        local is_known_action = (action == use_a_str) or (action == use_b_str)
+        return has_a, has_b, is_known_action
+      end
+    local apply_table_root =
+      function(A, B, Rules)
+        assert_table(A)
+        assert_table(B)
+        assert_table(Rules)
+        for index, Rule in ipairs(Rules) do
+          local has_a, has_b, is_known_action = check_rule(Rule)
+          if not (has_a and has_b and is_known_action) then
+            local err_msg = 'Unsupported rule at index ' .. tostring(index)
+            error(err_msg, 2)
+          end
+        end
+        apply_table(A, B, Rules)
+      end
+    return apply_table_root
+  end
+_G.package.preload['workshop.file_system.directory.get_directories_list'] =
+  function(...)
+    local get_cmd_listdirs = request('!.mechs.cmdline.get_cmd_listdirs')
+    local get_program_output_lines = request('!.system.get_program_output_lines')
+    local get_dirs_list =
+      function(base_dir)
+        local cmd_get_dirs = get_cmd_listdirs(base_dir)
+        local Dirs = get_program_output_lines(cmd_get_dirs)
+        return Dirs
+      end
+    return get_dirs_list
+  end
+_G.package.preload['workshop.file_system.directory.get_files_list'] =
+  function(...)
+    local get_cmd_listfiles = request('!.mechs.cmdline.get_cmd_listfiles')
+    local get_program_output_lines = request('!.system.get_program_output_lines')
+    local get_files_list =
+      function(base_dir)
+        local cmd_get_files = get_cmd_listfiles(base_dir)
+        local Result = get_program_output_lines(cmd_get_files)
+        return Result
+      end
+    return get_files_list
+  end
+_G.package.preload['workshop.file_system.file.open'] =
+  function(...)
+    local normalize_name = request('!.concepts.path_name.normalize')
+    local default_mode = 'rb'
+    local open_file =
+      function(pathname, mode)
+        assert_string(pathname)
+        assert(is_nil(mode) or is_string(mode))
+        pathname = normalize_name(pathname)
+        mode = mode or default_mode
+        local file, err_msg = io.open(pathname, mode)
+        if not file then
+          error(err_msg, 2)
+        end
+        return file
+      end
+    return open_file
+  end
+_G.package.preload['workshop.file_system.file.to_string'] =
+  function(...)
+    local open_file = request('open')
+    local load_file_contents =
+      function(pathname)
+        local File = open_file(pathname, 'rb')
+        local result = File:read('a')
+        File:close()
+        return result
+      end
+    return load_file_contents
+  end
+_G.package.preload['workshop.string.ends_with'] =
+  function(...)
+    local quote_regexp = request('!.lua.regexp.quote')
+    local ends_with =
+      function(base_str, postfix_str)
+        local postfix_pattern = quote_regexp(postfix_str) .. '$'
+        local start_pos = string.find(base_str, postfix_pattern)
+        local result = is_number(start_pos)
+        return result
+      end
+    return ends_with
+  end
+_G.package.preload['workshop.string.remove_prefix'] =
+  function(...)
+    local quote_regexp = request('!.lua.regexp.quote')
+    local remove_prefix =
+      function(base_str, prefix_str)
+        local prefix_regexp = '^' .. quote_regexp(prefix_str)
+        local result = string.gsub(base_str, prefix_regexp, '')
+        return result
+      end
+    return remove_prefix
+  end
+_G.package.preload['workshop.string.content_attributes'] =
+  function(...)
+    local has_control_chars =
+      function(s)
+        return s:find('%c') and true
+      end
+    local has_backslashes =
+      function(s)
+        return s:find([[%\]]) and true
+      end
+    local has_single_quotes =
+      function(s)
+        return s:find([[%']]) and true
+      end
+    local has_double_quotes =
+      function(s)
+        return s:find([[%"]]) and true
+      end
+    local is_nonascii =
+      function(s)
+        return s:find('[^%w%s_%p]')
+      end
+    local has_newlines =
+      function(s)
+        return s:find('[\n\r]')
+      end
+    return
+      {
+        has_control_chars = has_control_chars,
+        has_backslashes = has_backslashes,
+        has_single_quotes = has_single_quotes,
+        has_double_quotes = has_double_quotes,
+        is_nonascii = is_nonascii,
+        has_newlines = has_newlines,
       }
-    )
-
-    if (Path.first_node == self_dir) and (#Path >= 3) then
-      table.remove(Path, 1)
-    end
-
-    if (Path.last_node == self_dir) and (#Path >= 2) then
-      Path[#Path] = ''
-    end
-
-    local is_directory =
-      (Path.last_node == self_dir) or
-      (Path.last_node == upper_dir) or
-      (Path.last_node == empty)
-
-    if
-      is_directory and
-      (
-        (Path.last_node ~= empty) or
-        (#Path == 1)
-      )
-    then
-      table.insert(Path, '')
-    end
-
-    --[[
-      Now <Path> contains at least two entries
-
-      If first entry is "" then it's absolute path.
-      If last entry is "" then it's directory.
-    ]]
-
-    return Path
   end
-
--- Export:
-return pathname_from_str
-
---[[
-  Notes
-
-    * POSIX pathnames are elegant
-
-      Don't treat them as strings. Treat them as slash-separated
-      strings list.
-
-    * Empty string as pathname is illegal in POSIX
-
-      This code will process it as "/". But empty string is stupid,
-      so empty string is under assert().
-
-    * ".." element
-
-      It does not interpret "a/b/.." as "a/" because "b" may be
-      symlink to another directory.
-
-  Examples
-
-    a
-      { 'a' }
-
-    a/
-      { 'a', '' }
-
-    /a
-      { '', 'a' }
-
-    /a/
-      { '', 'a', '' }
-
-    a/b
-      { 'a', 'b' }
-
-    /
-      { '', '' }
-
-    /.
-      Same as for "/"
-
-    .
-      { '.', '' }
-
-    ./
-      Same as for "."
-
-    ..
-      { '..', '' }
-
-    ../
-    ./..
-      Same as for ".."
-
-    /..
-      { '', '..', '' }
-
-    ././..//a/./.
-      { '..', 'a', '' }
-]]
-
---[[
-  2016-09
-  2018-06
-  2026-04 # # # #
-  2026-06-11
-  2026-06-12
-]]
-end
--- ) ( module workshop.concepts.path_name.pathname_from_str )
-
--- ( ( module workshop.concepts.path_name.normalize )
+_G.package.preload['workshop.string.split'] =
+  function(...)
+    local ends_with = request('!.string.ends_with')
+    local quote_regexp = request('!.lua.regexp.quote')
+    local add_to_list = request('!.concepts.list.add_item')
+    local split_string =
+      function(str, delimiter)
+        assert_string(str)
+        assert_string(delimiter)
+        if (delimiter == '') then
+          return {str}
+        end
+        if not ends_with(str, delimiter) then
+          str = str .. delimiter
+        end
+        local Result = {}
+        local item_capture = '(.-)' .. quote_regexp(delimiter) .. '()'
+        local start_pos
+        local end_pos
+        local item_str
+        start_pos = 1
+        while true do
+          start_pos, end_pos, item_str = string.find(str, item_capture, start_pos)
+          if not start_pos then
+            break
+          end
+          add_to_list(Result, item_str)
+          start_pos = end_pos + 1
+        end
+        return Result
+      end
+    return split_string
+  end
+_G.package.preload['workshop.convert.lines_from_str'] =
+  function(...)
+    local split_string = request('!.string.split')
+    local string_to_lines =
+      function(str)
+        local newline = '\n'
+        return split_string(str, newline)
+      end
+    return string_to_lines
+  end
+_G.package.preload['workshop.convert.file_to_str'] =
+  function(...)
+    return request('!.file_system.file.to_string')
+  end
+_G.package.preload['workshop.concepts.lua.NumberTypeNames'] =
+  function(...)
+    local NumberTypeNames = {'integer', 'float'}
+    return NumberTypeNames
+  end
+_G.package.preload['workshop.concepts.lua.TypeNames'] =
+  function(...)
+    local TypeNames =
+      {'nil', 'boolean', 'number', 'string', 'function', 'thread', 'userdata', 'table'}
+    return TypeNames
+  end
+_G.package.preload['workshop.concepts.lua.quote_string'] =
+  function(...)
+    local quote_escaped = request('quote_string.linear')
+    local quote_intact = request('quote_string.intact')
+    local quote_aggressive = request('quote_string.dump')
+    local content_funcs = request('!.string.content_attributes')
+    local has_control_chars = content_funcs.has_control_chars
+    local has_backslashes = content_funcs.has_backslashes
+    local has_single_quotes = content_funcs.has_single_quotes
+    local has_double_quotes = content_funcs.has_double_quotes
+    local has_newlines = content_funcs.has_newlines
+    local binary_entities_lengths =
+      {[1] = true, [2] = true, [4] = true, [8] = true, [16] = true}
+    return
+      function(s)
+        assert_string(s)
+        local quote_func = quote_escaped
+        if binary_entities_lengths[#s] and has_control_chars(s) then
+          quote_func = quote_aggressive
+        elseif
+          has_backslashes(s) or
+          has_newlines(s) or
+          (has_single_quotes(s) and has_double_quotes(s))
+        then
+          quote_func = quote_intact
+        end
+        local result = quote_func(s)
+        return result
+      end
+  end
+_G.package.preload['workshop.concepts.lua.quote_string.intact'] =
+  function(...)
+    local has_newlines = request('!.string.content_attributes').has_newlines
+    return
+      function(s)
+        assert_string(s)
+        s = s .. ']'
+        local eq_chunk = ''
+        local postfix
+        while true do
+          postfix = ']' .. eq_chunk .. ']'
+          if not s:find(postfix, 1, true) then
+            break
+          end
+          eq_chunk = eq_chunk .. '='
+        end
+        local prefix = '[' .. eq_chunk .. '['
+        local first_char = s:sub(1, 1)
+        if (first_char == '\x0D') or (first_char == '\x0A') then
+          prefix = prefix .. first_char
+        end
+        if has_newlines(s) then
+          prefix = prefix .. '\x0A'
+        end
+        return prefix .. s .. eq_chunk .. ']'
+      end
+  end
+_G.package.preload['workshop.concepts.lua.quote_string.linear'] =
+  function(...)
+    local quote_char = request('quote_char')
+    local custom_quotes = request('custom_quotes')
+    return
+      function(s)
+        local result = s
+        result = result:gsub([[\]], quote_char)
+        result = result:gsub('[%c]', quote_char)
+        local cnt_q1 = 0
+        for i in result:gmatch("'") do
+          cnt_q1 = cnt_q1 + 1
+        end
+        local cnt_q2 = 0
+        for i in result:gmatch('"') do
+          cnt_q2 = cnt_q2 + 1
+        end
+        if (cnt_q1 <= cnt_q2) then
+          result = "'" .. result:gsub("'", custom_quotes["'"]) .. "'"
+        else
+          result = '"' .. result:gsub('"', custom_quotes['"']) .. '"'
+        end
+        return result
+      end
+  end
+_G.package.preload['workshop.concepts.lua.quote_string.dump'] =
+  function(...)
+    local quote_char = request('quote_char')
+    return
+      function(s)
+        assert_string(s)
+        return "'" .. s:gsub('.', quote_char) .. "'"
+      end
+  end
+_G.package.preload['workshop.concepts.lua.quote_string.quote_char'] =
+  function(...)
+    return
+      function(c)
+        return ([[\x%02X]]):format(c:byte(1, 1))
+      end
+  end
+_G.package.preload['workshop.concepts.lua.quote_string.custom_quotes'] =
+  function(...)
+    return
+      {
+        ['\x07'] = [[\a]],
+        ['\x08'] = [[\b]],
+        ['\x09'] = [[\t]],
+        ['\x0a'] = [[\n]],
+        ['\x0b'] = [[\v]],
+        ['\x0c'] = [[\f]],
+        ['\x0d'] = [[\r]],
+        ['"'] = [[\"]],
+        ["'"] = [[\']],
+        ['\\'] = [[\\]],
+      }
+  end
+_G.package.preload['workshop.concepts.shell.quote'] =
+  function(...)
+    local list_to_str = request('!.concepts.list.to_string')
+    local split_string = request('!.string.split')
+    local add_to_list = request('!.concepts.list.add_item')
+    local special_chars_regexp
+    local starts_with_comment_regexp
+    do
+      local quote_regexp = request('!.lua.regexp.quote')
+      do
+        local SpecialChars = request('quote.SpecialChars')
+        local special_chars_str = list_to_str(SpecialChars)
+        special_chars_regexp = '[' .. quote_regexp(special_chars_str) .. ']'
+      end
+      do
+        local SpaceChars = request('quote.SpaceChars')
+        local space_chars_str = list_to_str(SpaceChars)
+        local space_chars_regexp = '[' .. quote_regexp(space_chars_str) .. ']'
+        local comment_char = '#'
+        starts_with_comment_regexp = '^' .. space_chars_regexp .. '+' .. comment_char
+      end
+    end
+    local needs_quoting =
+      function(str)
+        return
+          (str == '') or
+          not is_nil(string.find(str, special_chars_regexp)) or
+          not is_nil(string.find(str, starts_with_comment_regexp))
+      end
+    local quote
+    quote =
+      function(str)
+        assert_string(str)
+        if not needs_quoting(str) then
+          return str
+        end
+        local single_quote = "'"
+        if not string.find(str, single_quote) then
+          return single_quote .. str .. single_quote
+        end
+        str = str .. single_quote
+        local RawItems = split_string(str, single_quote)
+        local Items = {}
+        for _, item in ipairs(RawItems) do
+          local quoted_item
+          if (item == '') then
+            quoted_item = ''
+          else
+            quoted_item = quote(item)
+          end
+          add_to_list(Items, quoted_item)
+        end
+        return list_to_str(Items, [[\]] .. single_quote)
+      end
+    return quote
+  end
+_G.package.preload['workshop.concepts.shell.execute'] =
+  function(...)
+    local file_to_str = request('!.convert.file_to_str')
+    local get_execute_command = request('!.mechs.cmdline.get_cmd_execute_with_redirects')
+    local execute_shell_command =
+      function(command)
+        local output_filename = os.tmpname()
+        local error_filename = os.tmpname()
+        local shell_command = get_execute_command(command, output_filename, error_filename)
+        local _, result_type_code, result_code = os.execute(shell_command)
+        local Result = {}
+        if (result_type_code == 'exit') then
+          Result.is_aborted = false
+        elseif (result_type_code == 'signal') then
+          Result.is_aborted = true
+        end
+        Result.result_code = result_code
+        Result.output = file_to_str(output_filename)
+        Result.error = file_to_str(error_filename)
+        os.remove(output_filename)
+        os.remove(error_filename)
+        return Result
+      end
+    return execute_shell_command
+  end
+_G.package.preload['workshop.concepts.shell.quote.SpecialChars'] =
+  function(...)
+    local SpaceChars = request('SpaceChars')
+    local add_list = request('!.concepts.list.add_list')
+    local SpecialChars =
+      {
+        '"',
+        '$',
+        '&',
+        "'",
+        '(',
+        ')',
+        '*',
+        ';',
+        '<',
+        '>',
+        '[',
+        [[\]],
+        ']',
+        '^',
+        '`',
+        '{',
+        '|',
+        '}',
+      }
+    add_list(SpecialChars, SpaceChars)
+    return SpecialChars
+  end
+_G.package.preload['workshop.concepts.shell.quote.SpaceChars'] =
+  function(...)
+    local SpaceChars = {'\009', '\010', ' '}
+    return SpaceChars
+  end
+_G.package.preload['workshop.concepts.list.to_string'] =
+  function(...)
+    local to_string =
+      function(List, separator_str)
+        assert_table(List)
+        separator_str = separator_str or ''
+        assert_string(separator_str)
+        return table.concat(List, separator_str)
+      end
+    return to_string
+  end
+_G.package.preload['workshop.concepts.list.add_item'] =
+  function(...)
+    local add_item =
+      function(OurList, item)
+        table.insert(OurList, item)
+      end
+    return add_item
+  end
+_G.package.preload['workshop.concepts.list.add_list'] =
+  function(...)
+    local add_list =
+      function(OurList, AnotherList)
+        table.move(AnotherList, 1, #AnotherList, #OurList + 1, OurList)
+      end
+    return add_list
+  end
+_G.package.preload['workshop.concepts.words.to_string'] =
+  function(...)
+    local list_to_string = request('!.concepts.list.to_string')
+    local to_string =
+      function(Words)
+        return list_to_string(Words, ' ')
+      end
+    return to_string
+  end
+_G.package.preload['workshop.concepts.FilesLister.RemoveBaseDirPrefix'] =
+  function(...)
+    local remove_prefix = request('!.string.remove_prefix')
+    local RemoveBaseDirPrefix =
+      function(Me, FileNames)
+        local base_dir = Me.BaseDir
+        for i = 1, #FileNames do
+          FileNames[i] = remove_prefix(FileNames[i], base_dir)
+        end
+        for i = #FileNames, 1, -1 do
+          if (FileNames[i] == '') then
+            table.remove(FileNames, i)
+          end
+        end
+      end
+    return RemoveBaseDirPrefix
+  end
+_G.package.preload['workshop.concepts.FilesLister.GetFiles'] =
+  function(...)
+    local get_files_list = request('!.file_system.directory.get_files_list')
+    local GetFilesList =
+      function(Me)
+        local FileNames = get_files_list(Me.BaseDir)
+        Me:RemoveBaseDirPrefix(FileNames)
+        return FileNames
+      end
+    return GetFilesList
+  end
+_G.package.preload['workshop.concepts.FilesLister.GetBaseDirectory'] =
+  function(...)
+    local GetBaseDir =
+      function(Me)
+        return Me.BaseDir
+      end
+    return GetBaseDir
+  end
+_G.package.preload['workshop.concepts.FilesLister.SetBaseDirectory'] =
+  function(...)
+    local add_dir_postfix = request('!.concepts.path_name.add_dir_postfix')
+    local normalize_name = request('!.concepts.path_name.normalize')
+    local SetBaseDir =
+      function(Me, base_dir)
+        assert_string(base_dir)
+        base_dir = add_dir_postfix(base_dir)
+        base_dir = normalize_name(base_dir)
+        Me.BaseDir = base_dir
+      end
+    return SetBaseDir
+  end
+_G.package.preload['workshop.concepts.FilesLister.GetDirectories'] =
+  function(...)
+    local get_dirs_list = request('!.file_system.directory.get_directories_list')
+    local GetDirectories =
+      function(Me)
+        local Dirs = get_dirs_list(Me.BaseDir)
+        Me:RemoveBaseDirPrefix(Dirs)
+        return Dirs
+      end
+    return GetDirectories
+  end
+_G.package.preload['workshop.concepts.FilesLister.Interface'] =
+  function(...)
+    return
+      {
+        SetBaseDirectory = request('SetBaseDirectory'),
+        GetBaseDirectory = request('GetBaseDirectory'),
+        GetFiles = request('GetFiles'),
+        GetDirectories = request('GetDirectories'),
+        BaseDir = './',
+        RemoveBaseDirPrefix = request('RemoveBaseDirPrefix'),
+      }
+  end
+_G.package.preload['workshop.concepts.path_name.pathname_to_str'] =
+  function(...)
+    local list_to_str = request('!.concepts.list.to_string')
+    local names_sep = '/'
+    local pathname_to_str =
+      function(Pathname)
+        return list_to_str(Pathname, names_sep)
+      end
+    return pathname_to_str
+  end
+_G.package.preload['workshop.concepts.path_name.pathname_from_str'] =
+  function(...)
+    local split_string = request('!.string.split')
+    local sep = '/'
+    local empty = ''
+    local self_dir = '.'
+    local upper_dir = '..'
+    local pathname_from_str =
+      function(path_name)
+        assert_string(path_name)
+        assert(path_name ~= '', 'Please pass not empty path_name')
+        path_name = path_name .. sep
+        local Path = split_string(path_name, sep)
+        do
+          local index = 2
+          local current_item
+          while (index <= #Path - 1) do
+            current_item = Path[index]
+            if (current_item == empty) or (current_item == self_dir) then
+              table.remove(Path, index)
+            else
+              index = index + 1
+            end
+          end
+        end
+        setmetatable(
+          Path,
+          {
+            __index =
+              function(table, key)
+                if (key == 'first_node') then
+                  return table[1]
+                elseif (key == 'last_node') then
+                  return table[#table]
+                end
+              end,
+          }
+        )
+        if (Path.first_node == self_dir) and (#Path >= 3) then
+          table.remove(Path, 1)
+        end
+        if (Path.last_node == self_dir) and (#Path >= 2) then
+          Path[#Path] = ''
+        end
+        local is_directory =
+          (Path.last_node == self_dir) or
+          (Path.last_node == upper_dir) or
+          (Path.last_node == empty)
+        if is_directory and ((Path.last_node ~= empty) or (#Path == 1)) then
+          table.insert(Path, '')
+        end
+        return Path
+      end
+    return pathname_from_str
+  end
 _G.package.preload['workshop.concepts.path_name.normalize'] =
-function(...)
--- Normalize pathname
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-12
-]]
-
--- Imports:
-local pathname_from_str = request('pathname_from_str')
-local pathname_to_str = request('pathname_to_str')
-
---[[
-  Normalize string with Unix path-name.
-
-  "/.////a" -> "/a"
-]]
-local normalize_name =
-  function(path_name)
-    return pathname_to_str(pathname_from_str(path_name))
+  function(...)
+    local pathname_from_str = request('pathname_from_str')
+    local pathname_to_str = request('pathname_to_str')
+    local normalize_name =
+      function(path_name)
+        return pathname_to_str(pathname_from_str(path_name))
+      end
+    return normalize_name
   end
-
--- Export:
-return normalize_name
-
---[[
-  2018-06
-]]
-end
--- ) ( module workshop.concepts.path_name.normalize )
-
--- ( ( module workshop.concepts.path_name.add_dir_postfix )
 _G.package.preload['workshop.concepts.path_name.add_dir_postfix'] =
-function(...)
--- Add "/" to end of string if needed
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-16
-]]
-
--- Imports:
-local ends_with = request('!.string.ends_with')
-
-local add_dir_postfix =
-  function(str)
-    local dir_sep = '/'
-
-    if ends_with(str, dir_sep) then return str end
-
-    return str .. dir_sep
+  function(...)
+    local ends_with = request('!.string.ends_with')
+    local add_dir_postfix =
+      function(str)
+        local dir_sep = '/'
+        if ends_with(str, dir_sep) then
+          return str
+        end
+        return str .. dir_sep
+      end
+    return add_dir_postfix
   end
-
-return add_dir_postfix
-
---[[
-  2018-02-05
-  2026-06-16
-]]
-end
--- ) ( module workshop.concepts.path_name.add_dir_postfix )
-
 require('meld')
