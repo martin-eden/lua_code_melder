@@ -13,6 +13,10 @@
 # We will create executable shell file "meld" there.
 # It's plain Lua code, shebang line and "executable" attribute.
 #
+# Toolchain uses my "lua code formatter" tool to strip comments.
+#
+#   https://github.com/martin-eden/lua_code_formatter
+#
 
 set -eu
 
@@ -33,13 +37,17 @@ lua meld.lua . meld > ../bin/meld.melded.lua
 
 cd ../bin
 
-# Add shebang to compiled code
-shebang='#!/usr/local/bin/lua'"\n"
-echo "$shebang" > meld.melded.shebang.lua
-cat meld.melded.lua >> meld.melded.shebang.lua
+# Use Lua code formatter to remove comments and indent code
+reformat_lua meld.melded.lua meld.melded.stripped.lua --~keep-comments
 rm meld.melded.lua
 
-mv meld.melded.shebang.lua meld
+# Add shebang to compiled code
+shebang='#!/usr/local/bin/lua'"\n"
+echo "$shebang" > meld.melded.stripped.shebanged.lua
+cat meld.melded.stripped.lua >> meld.melded.stripped.shebanged.lua
+rm meld.melded.stripped.lua
+
+mv meld.melded.stripped.shebanged.lua meld
 
 chmod +x meld
 
