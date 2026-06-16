@@ -48,7 +48,6 @@ local add_dir_postfix = request('!.concepts.path_name.add_dir_postfix')
 local FilesLister = request('!.concepts.FilesLister.Interface')
 local file_to_str = request('!.convert.file_to_str')
 local add_to_list = request('!.concepts.list.add_item')
-local Lines = request('!.concepts.Lines.Interface')
 local string_ends_with = request('!.string.ends_with')
 local lua_quote_string = request('!.concepts.lua.quote_string')
 
@@ -114,44 +113,49 @@ local get_modules =
     return Result
   end
 
+local emit =
+  function(str)
+    io.write(str)
+
+    local newline = '\n'
+
+    if not string_ends_with(str, newline) then
+      io.write(newline)
+    end
+  end
+
 local add_module_registration =
-  function(Lines, module_name, module_code)
+  function(module_name, module_code)
     local quoted_module_name = lua_quote_string(module_name)
 
     local module_id = '( module ' .. module_name .. ' )'
 
-    Lines:Add('-- ( ' .. module_id)
-    Lines:Add('_G.package.preload[' .. quoted_module_name .. '] =')
-    Lines:Add('function(...)')
-    Lines:Add(module_code)
-    Lines:Add('end')
-    Lines:Add('-- ) ' .. module_id)
-    Lines:Add('')
+    emit('-- ( ' .. module_id)
+    emit('_G.package.preload[' .. quoted_module_name .. '] =')
+    emit('function(...)')
+    emit(module_code)
+    emit('end')
+    emit('-- ) ' .. module_id)
+    emit('')
   end
 
 local add_module_call =
-  function(Lines, module_name)
-    local module_call_fmt = "require('%s')"
-
-    Lines:Add(string.format(module_call_fmt, module_name))
+  function(module_name)
+    emit("require('" ..module_name .. "')")
   end
 
 local meld =
   function(modules_dir, root_module)
     local Modules = get_modules(modules_dir)
 
-    local Lines = new(Lines)
-
     for _, Rec in ipairs(Modules) do
       local module_name = Rec[1]
       local module_code = Rec[2]
 
-      add_module_registration(Lines, module_name, module_code)
+      add_module_registration(module_name, module_code)
     end
 
-    add_module_call(Lines, root_module)
-
-    return Lines:ToString()
+    add_module_call(root_module)
   end
 
 -- Main:
@@ -167,7 +171,7 @@ do
 
   modules_dir = add_dir_postfix(modules_dir)
 
-  io.write(meld(modules_dir, root_module))
+  meld(modules_dir, root_module)
 end
 
 --[[
@@ -395,7 +399,7 @@ function(...)
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-04-22
+  Last mod.: 2026-06-16
 ]]
 
 --[[
@@ -404,8 +408,8 @@ function(...)
 ]]
 
 -- Imports:
-local DataTypes = request('!.lua.data_types')
-local MathTypes = request('!.lua.data_mathtypes')
+local TypeNames = request('!.concepts.lua.TypeNames')
+local NumberTypeNames = request('!.concepts.lua.NumberTypeNames')
 
 local type_is =
   function(type_name)
@@ -432,10 +436,10 @@ local number_is =
 
 local install_is_functions =
   function()
-    for _, type_name in ipairs(DataTypes) do
+    for _, type_name in ipairs(TypeNames) do
       _G['is_' .. type_name] = type_is(type_name)
     end
-    for _, math_type_name in ipairs(MathTypes) do
+    for _, math_type_name in ipairs(NumberTypeNames) do
       _G['is_' .. math_type_name] = number_is(math_type_name)
     end
   end
@@ -445,9 +449,9 @@ return install_is_functions
 
 --[[
   2018-02
-  2020-01
-  2022-01
-  2024-03
+  2020 #
+  2022 #
+  2024 #
   2026-04-22
 ]]
 end
@@ -498,12 +502,12 @@ function(...)
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-04-22
+  Last mod.: 2026-06-16
 ]]
 
 -- Imports:
-local DataTypes = request('!.lua.data_types')
-local MathTypes = request('!.lua.data_mathtypes')
+local TypeNames = request('!.concepts.lua.TypeNames')
+local NumberTypeNames = request('!.concepts.lua.NumberTypeNames')
 
 local spawn_assert_func =
   function(type_name)
@@ -524,11 +528,11 @@ local spawn_assert_func =
 
 local install_assert_funcs =
   function()
-    for _, type_name in ipairs(DataTypes) do
+    for _, type_name in ipairs(TypeNames) do
       _G['assert_' .. type_name] = spawn_assert_func(type_name)
     end
 
-    for _, number_type_name in ipairs(MathTypes) do
+    for _, number_type_name in ipairs(NumberTypeNames) do
       _G['assert_' .. number_type_name] = spawn_assert_func(number_type_name)
     end
   end
@@ -538,83 +542,13 @@ return install_assert_funcs
 
 --[[
   2018-02
-  2020-01
-  2022-01
-  2024-03
+  2020 #
+  2022 #
+  2024 #
   2026-04-22
 ]]
 end
 -- ) ( module workshop.system.install_assert_functions )
-
--- ( ( module workshop.lua.data_mathtypes )
-_G.package.preload['workshop.lua.data_mathtypes'] =
-function(...)
--- Return list of numeric type names
-
---[[
-  Output
-
-    table
-
-      List with number type names as they are returned
-      by math.type() function.
-
-  Note
-
-    Used in code generation.
-]]
-
--- Last mod.: 2024-08-06
-
-return
-  {
-    'integer',
-    'float',
-  }
-
---[[
-  2024-03-02
-]]
-end
--- ) ( module workshop.lua.data_mathtypes )
-
--- ( ( module workshop.lua.data_types )
-_G.package.preload['workshop.lua.data_types'] =
-function(...)
--- Return list with names of all Lua data types
-
---[[
-  Output
-
-    table
-
-      List of strings with type names as they are returned
-      by type() function.
-
-  Note
-
-    Used in code generation.
-]]
-
--- Last mod.: 2024-08-06
-
-return
-  {
-    'nil',
-    'boolean',
-    'number',
-    'string',
-    'function',
-    'thread',
-    'userdata',
-    'table',
-  }
-
---[[
-  2018-02
-]]
-end
--- ) ( module workshop.lua.data_types )
 
 -- ( ( module workshop.lua.regexp.magic_chars )
 _G.package.preload['workshop.lua.regexp.magic_chars'] =
@@ -1201,76 +1135,6 @@ return load_file_contents
 end
 -- ) ( module workshop.file_system.file.to_string )
 
--- ( ( module workshop.string.starts_with )
-_G.package.preload['workshop.string.starts_with'] =
-function(...)
--- Return true if string starts with given string
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-04-26
-]]
-
--- Imports:
-local quote_regexp = request('!.lua.regexp.quote')
-
---[[
-  Returns true if string starts with given string
-
-  Magic characters are quoted.
-]]
-local starts_with =
-  function(base_str, prefix_str)
-    local prefix_pattern = '^' .. quote_regexp(prefix_str)
-
-    local start_pos = string.find(base_str, prefix_pattern)
-
-    local result = is_number(start_pos)
-
-    return result
-  end
-
--- Export:
-return starts_with
-
---[[
-  2026-04-23
-]]
-end
--- ) ( module workshop.string.starts_with )
-
--- ( ( module workshop.string.trim_tail )
-_G.package.preload['workshop.string.trim_tail'] =
-function(...)
--- Remove spaces at end of string
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-05-04
-]]
-
-local trim_tail =
-  function(str)
-    assert_string(str)
-
-    local read_pos = string.len(str)
-
-    while (string.sub(str, read_pos, read_pos) == ' ') do
-      read_pos = read_pos - 1
-    end
-
-    return string.sub(str, 1, read_pos)
-  end
-
--- Export:
-return trim_tail
-
---[[
-  2017-01-20
-]]
-end
--- ) ( module workshop.string.trim_tail )
-
 -- ( ( module workshop.string.ends_with )
 _G.package.preload['workshop.string.ends_with'] =
 function(...)
@@ -1473,44 +1337,6 @@ return split_string
 end
 -- ) ( module workshop.string.split )
 
--- ( ( module workshop.string.trim_tail_nls )
-_G.package.preload['workshop.string.trim_tail_nls'] =
-function(...)
--- Trim possible tail newlines from string
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-05-04
-]]
-
-local NewlineChars_Map =
-  {
-    ['\x0d'] = true,
-    ['\x0a'] = true,
-  }
-
-local trim_tail_nls =
-  function(str)
-    assert_string(str)
-
-    local finish_pos = #str
-    while NewlineChars_Map[string.sub(str, finish_pos, finish_pos)] do
-      finish_pos = finish_pos - 1
-    end
-
-    return string.sub(str, 1, finish_pos)
-  end
-
--- Export:
-return trim_tail_nls
-
---[[
-  2016-09
-  2026-04-26
-]]
-end
--- ) ( module workshop.string.trim_tail_nls )
-
 -- ( ( module workshop.convert.lines_from_str )
 _G.package.preload['workshop.convert.lines_from_str'] =
 function(...)
@@ -1562,37 +1388,63 @@ return request('!.file_system.file.to_string')
 end
 -- ) ( module workshop.convert.file_to_str )
 
--- ( ( module workshop.convert.lines_to_str )
-_G.package.preload['workshop.convert.lines_to_str'] =
+-- ( ( module workshop.concepts.lua.NumberTypeNames )
+_G.package.preload['workshop.concepts.lua.NumberTypeNames'] =
 function(...)
--- Convert lines to string
+-- Return list of numeric type names
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-05-29
+  Last mod.: 2026-06-16
 ]]
 
--- Imports:
-local list_to_string = request('!.concepts.list.to_string')
-
--- Concatenate strings list using newline separator. Tailing newline.
-local lines_to_str =
-  function(Lines)
-    local newline = '\n'
-
-    return list_to_string(Lines, newline) .. newline
-  end
+local NumberTypeNames =
+  {
+    'integer',
+    'float',
+  }
 
 -- Export:
-return lines_to_str
+return NumberTypeNames
 
 --[[
-  2024 #
-  2026-04 #
-  2026-05-04
+  2024-03-02
+  2026-06-16
 ]]
 end
--- ) ( module workshop.convert.lines_to_str )
+-- ) ( module workshop.concepts.lua.NumberTypeNames )
+
+-- ( ( module workshop.concepts.lua.TypeNames )
+_G.package.preload['workshop.concepts.lua.TypeNames'] =
+function(...)
+-- List with names of all Lua data types
+
+--[[
+  Author: Martin Eden
+  Last mod.: 2026-06-16
+]]
+
+local TypeNames =
+  {
+    'nil',
+    'boolean',
+    'number',
+    'string',
+    'function',
+    'thread',
+    'userdata',
+    'table',
+  }
+
+-- Export:
+return TypeNames
+
+--[[
+  2018-02
+  2026-06-16
+]]
+end
+-- ) ( module workshop.concepts.lua.TypeNames )
 
 -- ( ( module workshop.concepts.lua.quote_string )
 _G.package.preload['workshop.concepts.lua.quote_string'] =
@@ -2284,447 +2136,6 @@ return to_string
 ]]
 end
 -- ) ( module workshop.concepts.words.to_string )
-
--- ( ( module workshop.concepts.Lines.Interface )
-_G.package.preload['workshop.concepts.Lines.Interface'] =
-function(...)
--- List of lines interface. Frontend
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-06-16
-]]
-
---[[
-  This class is about storing list of lines
-
-  Lines are stored as strings (without newlines).
-
-  Also we're providing convenience methods for indentation.
-]]
-
-local Core = request('Core.Interface')
-local Indenter = request('Indent-Methods')
-
--- ( Core wrappers
-
--- String to lines list
-local FromString =
-  function(Me, str)
-    local Core = Me.Core
-
-    Core:FromString(str)
-  end
-
--- Lines to string
-local ToString =
-  function(Me)
-    local Core = Me.Core
-
-    return Core:ToString()
-  end
-
--- Return number of lines
-local GetNumLines =
-  function(Me)
-    local Core = Me.Core
-
-    return Core:GetNumItems()
-  end
-
--- Return line's contents by index
-local GetLineAt =
-  function(Me, index)
-    local Core = Me.Core
-
-    Core:AssertValidIndex(index)
-
-    return Core:GetItem(index)
-  end
-
--- Set line at given index
-local SetLineAt =
-  function(Me, str, index)
-    local Core = Me.Core
-
-    Core:AssertValidValue(str)
-    Core:AssertValidIndex(index)
-
-    Core:SetItem(Core:ToItem(str), index)
-  end
-
--- Insert line before given index
-local InsertLineBefore =
-  function(Me, str, index)
-    local Core = Me.Core
-
-    Core:AssertValidValue(str)
-    Core:AssertValidIndex(index)
-
-    Core:InsertItemBefore(Core:ToItem(str), index)
-  end
-
--- Insert line after given index
-local InsertLineAfter =
-  function(Me, str, index)
-    local Core = Me.Core
-
-    Core:AssertValidValue(str)
-    Core:AssertValidIndex(index)
-
-    Core:InsertItemBefore(Core:ToItem(str), index + 1)
-  end
-
--- Remove line at given index
-local RemoveLineAt =
-  function(Me, index)
-    local Core = Me.Core
-
-    Core:AssertValidIndex(index)
-
-    Core:RemoveItemAt(index)
-  end
-
--- ) Core wrappers
-
--- ( Extensions
-
--- Return true when we have just one line
-local IsOneLine =
-  function(Me)
-    return (Me:GetNumLines() == 1)
-  end
-
--- Return first line
-local GetFirstLine =
-  function(Me)
-    return Me:GetLineAt(1)
-  end
-
--- Return last line
-local GetLastLine =
-  function(Me)
-    return Me:GetLineAt(Me:GetNumLines())
-  end
-
--- Add string to start of list
-local AddFirstLine =
-  function(Me, str)
-    Me:InsertLineBefore(Me.Core:ToItem(str), 1)
-  end
-
--- Add string to end of list
-local AddLastLine =
-  function(Me, str)
-    Me:InsertLineAfter(Me.Core:ToItem(str), Me:GetNumLines())
-  end
-
--- Add string
-local Add =
-  function(Me, str)
-    Me:AddLastLine(str)
-  end
-
--- Remove first line
-local RemoveFirstLine =
-  function(Me)
-    Me:RemoveLineAt(1)
-  end
-
--- Remove last line
-local RemoveLastLine =
-  function(Me)
-    Me:RemoveLineAt(Me:GetNumLines())
-  end
-
--- ) Extensions
-
--- Export:
-return
-  {
-    -- Import/export:
-    FromString = FromString,
-    ToString = ToString,
-
-    -- Access:
-
-    GetNumLines = GetNumLines,
-
-    IsOneLine = IsOneLine,
-
-    GetLineAt = GetLineAt,
-
-    GetFirstLine = GetFirstLine,
-    GetLastLine = GetLastLine,
-
-    SetLineAt = SetLineAt,
-
-    InsertLineBefore = InsertLineBefore,
-    InsertLineAfter = InsertLineAfter,
-
-    AddFirstLine = AddFirstLine,
-    AddLastLine = AddLastLine,
-    Add = Add,
-
-    RemoveLineAt = RemoveLineAt,
-
-    RemoveFirstLine = RemoveFirstLine,
-    RemoveLastLine = RemoveLastLine,
-
-    -- Indentation:
-    Indent = Indenter.Indent,
-    Unindent = Indenter.Unindent,
-
-    -- Internals:
-    Core = Core,
-  }
-
---[[
-  2024 #
-  2026-04 # # #
-  2026-06-16
-]]
-end
--- ) ( module workshop.concepts.Lines.Interface )
-
--- ( ( module workshop.concepts.Lines.Indent-Methods )
-_G.package.preload['workshop.concepts.Lines.Indent-Methods'] =
-function(...)
--- Lines indent/unindent methods
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-04-26
-]]
-
--- Imports:
-local starts_with = request('!.string.starts_with')
-
-local indent_chunk = '  '
-
--- Adds indentation chunk to every non-empty line
-local Indent =
-  function(Lines)
-    for index = 1, Lines:GetNumLines() do
-      local line = Lines:GetLineAt(index)
-      if (line ~= '') then
-        Lines:SetLineAt(indent_chunk .. line, index)
-      end
-    end
-  end
-
--- Just removes indentation chunk from every line. If it can.
-local Unindent =
-  function(Lines)
-    for index = 1, Lines:GetNumLines() do
-      local line = Lines:GetLineAt(index)
-      if starts_with(line, indent_chunk) then
-        Lines:SetLineAt(string.sub(line, #indent_chunk + 1), index)
-      end
-    end
-  end
-
--- Exports:
-return
-  {
-    Indent = Indent,
-    Unindent = Unindent,
-  }
-
---[[
-  2024 #
-  2026-04-24
-  2026-04-26
-]]
-end
--- ) ( module workshop.concepts.Lines.Indent-Methods )
-
--- ( ( module workshop.concepts.Lines.Core.Access-Methods )
-_G.package.preload['workshop.concepts.Lines.Core.Access-Methods'] =
-function(...)
--- Read/write functions for items
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-04-26
-]]
-
-local GetItem =
-  function(Me, index)
-    return Me.Items[index]
-  end
-
-local SetItem =
-  function(Me, item, index)
-    Me.Items[index] = item
-  end
-
-local InsertItemBefore =
-  function(Me, item, index)
-    table.insert(Me.Items, index, item)
-  end
-
-local RemoveItemAt =
-  function(Me, index)
-    table.remove(Me.Items, index)
-  end
-
--- Export:
-return
-  {
-    GetItem = GetItem,
-    SetItem = SetItem,
-    InsertItemBefore = InsertItemBefore,
-    RemoveItemAt = RemoveItemAt,
-  }
-
---[[
-  2026-04-26
-]]
-end
--- ) ( module workshop.concepts.Lines.Core.Access-Methods )
-
--- ( ( module workshop.concepts.Lines.Core.Checks-Methods )
-_G.package.preload['workshop.concepts.Lines.Core.Checks-Methods'] =
-function(...)
--- Data checking/assertion functions
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-04-26
-]]
-
-local AssertValidIndex =
-  function(Me, index)
-    assert_integer(index)
-
-    local num_items = Me:GetNumItems(Me)
-
-    if (num_items == 0) then
-      assert((index == 0) or (index == 1))
-    else
-      assert((index >= 1) and (index <= num_items))
-    end
-  end
-
-local AssertValidValue =
-  function(Me, str)
-    assert_string(str)
-  end
-
--- Export:
-return
-  {
-    AssertValidIndex = AssertValidIndex,
-    AssertValidValue = AssertValidValue,
-  }
-
---[[
-  2026-04-26
-]]
-end
--- ) ( module workshop.concepts.Lines.Core.Checks-Methods )
-
--- ( ( module workshop.concepts.Lines.Core.Interface )
-_G.package.preload['workshop.concepts.Lines.Core.Interface'] =
-function(...)
--- Core functions for strings list
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-04-26
-]]
-
-local Checks = request('Checks-Methods')
-local ImpExp = request('ImpExp-Methods')
-local Access = request('Access-Methods')
-
-local GetNumItems =
-  function(Me)
-    return #Me.Items
-  end
-
-return
-  {
-    Items = {},
-
-    -- Discovery:
-    GetNumItems = GetNumItems,
-
-    -- Checks:
-    AssertValidIndex = Checks.AssertValidIndex,
-    AssertValidValue = Checks.AssertValidValue,
-
-    -- Import/export
-    ToItem = ImpExp.ToItem,
-    FromString = ImpExp.FromString,
-    ToString = ImpExp.ToString,
-
-    -- Read/write
-    GetItem = Access.GetItem,
-    SetItem = Access.SetItem,
-    InsertItemBefore = Access.InsertItemBefore,
-    RemoveItemAt = Access.RemoveItemAt,
-  }
-
---[[
-  2024 # #
-  2026-04-26
-]]
-end
--- ) ( module workshop.concepts.Lines.Core.Interface )
-
--- ( ( module workshop.concepts.Lines.Core.ImpExp-Methods )
-_G.package.preload['workshop.concepts.Lines.Core.ImpExp-Methods'] =
-function(...)
--- Import/export functions for items
-
---[[
-  Author: Martin Eden
-  Last mod.: 2026-05-04
-]]
-
--- Imports:
-local trim_tail_nls = request('!.string.trim_tail_nls')
-local trim_tail_spaces = request('!.string.trim_tail')
-local lines_from_str = request('!.convert.lines_from_str')
-local lines_to_str = request('!.convert.lines_to_str')
-
--- Convert string to line value
-local ToItem =
-  function(Me, str)
-    str = trim_tail_nls(str)
-    str = trim_tail_spaces(str)
-
-    return str
-  end
-
--- Explode string to list of lines
-local FromString =
-  function(Me, lines_str)
-    Me.Items = lines_from_str(lines_str)
-  end
-
--- Implode list of lines to string
-local ToString =
-  function(Me)
-    return lines_to_str(Me.Items)
-  end
-
--- Export:
-return
-  {
-    ToItem = ToItem,
-
-    FromString = FromString,
-    ToString = ToString,
-  }
-
---[[
-  2026-04-26
-]]
-end
--- ) ( module workshop.concepts.Lines.Core.ImpExp-Methods )
 
 -- ( ( module workshop.concepts.FilesLister.RemoveBaseDirPrefix )
 _G.package.preload['workshop.concepts.FilesLister.RemoveBaseDirPrefix'] =
