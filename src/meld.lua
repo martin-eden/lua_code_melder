@@ -2,7 +2,7 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-06-04
+  Last mod.: 2026-06-16
 ]]
 
 --[[ Develop
@@ -12,47 +12,39 @@ require('workshop.base')
 
 local Config =
   {
-    ModulesDir = arg[1],
-    RootModule = arg[2],
-    DoIndent = (arg[3] == '--indent'),
+    modules_dir = arg[1],
+    root_module = arg[2],
   }
 
 local usage_help = [[
-
 Merge all .lua files under given directory into one executable
 code block and print it.
 
 Usage
 
-  meld.lua <modules_dir> <root_module_name> [--indent]
+  meld <modules_dir> <root_module_name>
 
 Example
 
-  $ lua meld.lua test_case/ test --indent > ingots/test.lua
+  $ meld test_case/ test > ingots/test.lua
 
 Parameters
 
-  <modules_dir> -- Directory from which we search for .lua files
+  <modules_dir> -- Directory from which we search for .lua files.
 
   <root_module_name> -- Name of the "main" module which is called
     in generated code block.
 
-  --indent -- Indent code of embedded modules for nice output.
-
-    Indenting is not safe for code! If source code has multi-line strings
-    then spaces will be added to them.
-
-    So if you can test/review result code -- use this option.
-
--- Martin, 2026-04
+-- Martin, 2026-06
 ]]
 
+-- Imports:
+local add_dir_postfix = request('!.concepts.path_name.add_dir_postfix')
 local FilesLister = request('!.concepts.FilesLister.Interface')
-local parse_path_name = request('!.concepts.path_name.parse')
 local file_to_str = request('!.convert.file_to_str')
-local LinesClass = request('!.concepts.Lines.Interface')
+local add_to_list = request('!.concepts.list.add_item')
+local Lines = request('!.concepts.Lines.Interface')
 local string_ends_with = request('!.string.ends_with')
-local ordered_pairs = request('!.table.ordered_pass')
 local lua_quote_string = request('!.concepts.lua.quote_string')
 
 local is_lua_file =
@@ -63,13 +55,11 @@ local is_lua_file =
 -- Convert file name (without dir) to Lua's require() module name
 local get_module_name =
   function(file_name)
-    local module_name
-
     -- Module name is file name without ".lua" at end
-    local module_name_capture = '(.*)%.lua$'
-    module_name = string.match(file_name, module_name_capture)
 
-    return module_name
+    local module_name_capture = '(.*)%.lua$'
+
+    return string.match(file_name, module_name_capture)
   end
 
 --[[
@@ -79,31 +69,32 @@ local get_module_name =
 
     * Gets it's name as module name (for require())
     * Gets it's contents
-    * Adds to Result table: Result[module_name] = file_contents
+    * Adds to Result table: { module_name, file_contents }
 ]]
-local populate_modules
-populate_modules =
+local get_modules
+get_modules =
   function(base_dir_name, module_name_prefix, Result)
     FilesLister:SetBaseDirectory(base_dir_name)
-    base_dir_name = FilesLister:GetBaseDirectory()
 
     local Files = FilesLister:GetFiles()
 
     for _, file_name in ipairs(Files) do
-      if is_lua_file(file_name) then
-        local full_file_name = base_dir_name .. file_name
-        local file_contents = file_to_str(full_file_name)
-        local module_name = module_name_prefix .. get_module_name(file_name)
-        Result[module_name] = file_contents
-      end
+      if not is_lua_file(file_name) then goto next end
+
+      local module_name = module_name_prefix .. get_module_name(file_name)
+      local module_code = file_to_str(base_dir_name .. file_name)
+
+      add_to_list(Result, { module_name, module_code })
+
+      :: next ::
     end
 
     local Directories = FilesLister:GetDirectories()
 
     for _, subdir_name in ipairs(Directories) do
-      populate_modules(
-        base_dir_name .. subdir_name,
-        module_name_prefix .. string.sub(subdir_name, 1, -1) .. '.',
+      get_modules(
+        base_dir_name .. subdir_name .. '/',
+        module_name_prefix .. subdir_name .. '.',
         Result
       )
     end
@@ -111,77 +102,72 @@ populate_modules =
 
 local get_modules =
   function(start_dir)
-    start_dir = parse_path_name(start_dir).FullName
+    local Result = { }
 
-    local Result = {}
-
-    populate_modules(start_dir, '', Result)
+    get_modules(start_dir, '', Result)
 
     return Result
   end
 
 local add_module_registration =
-  function(Lines, module_name, module_code, do_indent)
+  function(Lines, module_name, module_code)
     local quoted_module_name = lua_quote_string(module_name)
 
-    if do_indent then
-      local ModuleLines = new(LinesClass)
-      ModuleLines:FromString(module_code)
-      ModuleLines:Indent()
-      ModuleLines:Indent()
-      module_code = ModuleLines:ToString()
+    local module_id = '( module ' .. module_name .. ' )'
 
-      Lines:AddLastLine('_G.package.preload[' .. quoted_module_name .. '] =')
-      Lines:AddLastLine('  function(...)')
-      Lines:AddLastLine(module_code)
-      Lines:AddLastLine('  end')
-    else
-      local module_id = 'module ' .. module_name
-
-      Lines:AddLastLine('-- ( ' .. module_id)
-      Lines:AddLastLine('_G.package.preload[' .. quoted_module_name .. '] =')
-      Lines:AddLastLine('function(...)')
-      Lines:AddLastLine(module_code)
-      Lines:AddLastLine('end')
-      Lines:AddLastLine('-- ) ' .. module_id)
-    end
+    Lines:Add('-- ( ' .. module_id)
+    Lines:Add('_G.package.preload[' .. quoted_module_name .. '] =')
+    Lines:Add('function(...)')
+    Lines:Add(module_code)
+    Lines:Add('end')
+    Lines:Add('-- ) ' .. module_id)
+    Lines:Add('')
   end
 
 local add_module_call =
   function(Lines, module_name)
-    local module_call_str
-
     local module_call_fmt = "require('%s')"
-    module_call_str = string.format(module_call_fmt, module_name)
 
-    Lines:AddLastLine(module_call_str)
+    Lines:Add(string.format(module_call_fmt, module_name))
   end
 
--- Main
+local meld =
+  function(modules_dir, root_module)
+    local Modules = get_modules(modules_dir)
+
+    local Lines = new(Lines)
+
+    for _, Rec in ipairs(Modules) do
+      local module_name = Rec[1]
+      local module_code = Rec[2]
+
+      add_module_registration(Lines, module_name, module_code)
+    end
+
+    add_module_call(Lines, root_module)
+
+    return Lines:ToString()
+  end
+
+-- Main:
 do
-  if not Config.ModulesDir or not Config.RootModule then
+  local modules_dir = Config.modules_dir
+  local root_module = Config.root_module
+
+  if not modules_dir or not root_module then
     io.write(usage_help)
+
     return
   end
 
-  local Modules = get_modules(Config.ModulesDir)
+  modules_dir = add_dir_postfix(modules_dir)
 
-  local Lines = new(LinesClass)
-
-  for module_name, module_code in ordered_pairs(Modules) do
-    add_module_registration(Lines, module_name, module_code, Config.DoIndent)
-    Lines:AddLastLine('')
-  end
-
-  add_module_call(Lines, Config.RootModule)
-
-  io.write(Lines:ToString())
+  io.write(meld(modules_dir, root_module))
 end
 
 --[[
   2024-11-20
-  2026-04-22
-  2026-04-23
-  2026-04-24
+  2026-04 # # #
   2026-06-04
+  2026-06-16
 ]]
