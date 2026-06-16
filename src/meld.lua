@@ -43,7 +43,6 @@ local add_dir_postfix = request('!.concepts.path_name.add_dir_postfix')
 local FilesLister = request('!.concepts.FilesLister.Interface')
 local file_to_str = request('!.convert.file_to_str')
 local add_to_list = request('!.concepts.list.add_item')
-local Lines = request('!.concepts.Lines.Interface')
 local string_ends_with = request('!.string.ends_with')
 local lua_quote_string = request('!.concepts.lua.quote_string')
 
@@ -109,44 +108,49 @@ local get_modules =
     return Result
   end
 
+local emit =
+  function(str)
+    io.write(str)
+
+    local newline = '\n'
+
+    if not string_ends_with(str, newline) then
+      io.write(newline)
+    end
+  end
+
 local add_module_registration =
-  function(Lines, module_name, module_code)
+  function(module_name, module_code)
     local quoted_module_name = lua_quote_string(module_name)
 
     local module_id = '( module ' .. module_name .. ' )'
 
-    Lines:Add('-- ( ' .. module_id)
-    Lines:Add('_G.package.preload[' .. quoted_module_name .. '] =')
-    Lines:Add('function(...)')
-    Lines:Add(module_code)
-    Lines:Add('end')
-    Lines:Add('-- ) ' .. module_id)
-    Lines:Add('')
+    emit('-- ( ' .. module_id)
+    emit('_G.package.preload[' .. quoted_module_name .. '] =')
+    emit('function(...)')
+    emit(module_code)
+    emit('end')
+    emit('-- ) ' .. module_id)
+    emit('')
   end
 
 local add_module_call =
-  function(Lines, module_name)
-    local module_call_fmt = "require('%s')"
-
-    Lines:Add(string.format(module_call_fmt, module_name))
+  function(module_name)
+    emit("require('" ..module_name .. "')")
   end
 
 local meld =
   function(modules_dir, root_module)
     local Modules = get_modules(modules_dir)
 
-    local Lines = new(Lines)
-
     for _, Rec in ipairs(Modules) do
       local module_name = Rec[1]
       local module_code = Rec[2]
 
-      add_module_registration(Lines, module_name, module_code)
+      add_module_registration(module_name, module_code)
     end
 
-    add_module_call(Lines, root_module)
-
-    return Lines:ToString()
+    add_module_call(root_module)
   end
 
 -- Main:
@@ -162,7 +166,7 @@ do
 
   modules_dir = add_dir_postfix(modules_dir)
 
-  io.write(meld(modules_dir, root_module))
+  meld(modules_dir, root_module)
 end
 
 --[[
