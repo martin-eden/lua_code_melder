@@ -4,7 +4,7 @@
 
 | Created | Updated |  Size   | License |
 |:-------:|:-------:|:-------:|:-------:|
-| 2024-11 | 2026-06 | < 60 K  |  LGPL3  |
+| 2024-11 | 2026-06 | < 35 K  |  LGPL3  |
 
 Command-line tool to aggregate all `*.lua` files in given directory
 and subdirectories into one.
@@ -49,9 +49,9 @@ Then it prints code to fill global `package.preload` table with entries like
 
 ```
 _G.package.preload[<module_name>] =
-  function(...)
+function(...)
 <module_code>
-  end
+end
 ```
 
 And finally it prints activation line, which is a mere `require(<root_module_name>)`.
