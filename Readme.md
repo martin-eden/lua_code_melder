@@ -2,45 +2,38 @@
 
 ## What
 
-| Created | Updated | Code size | License |
-|:-------:|:-------:|:---------:|:-------:|
-| 2024-11 | 2026-06 |  < 30 K   |  LGPL3  |
+| Created | Updated |  Size   | License |
+|:-------:|:-------:|:-------:|:-------:|
+| 2024-11 | 2026-06 | < 70 K  |  LGPL3  |
 
 Command-line tool to aggregate all `*.lua` files in given directory
-(and subdirectories) into one.
+and subdirectories into one.
+
+Compiles multi-file Lua program into one file.
 
 
-## Example
+## Usage
 
 ```
-$ lua meld.lua
-
 Merge all .lua files under given directory into one executable
 code block and print it.
 
 Usage
 
-  meld.lua <modules_dir> <root_module_name> [--indent]
+  meld <modules_dir> <root_module_name>
 
 Example
 
-  $ lua meld.lua test_case/ test --indent > ingots/test.lua
+  $ meld test_case/ test > ingots/test.lua
 
 Parameters
 
-  <modules_dir> -- Directory from which we search for .lua files
+  <modules_dir> -- Directory from which we search for .lua files.
 
   <root_module_name> -- Name of the "main" module which is called
     in generated code block.
 
-  --indent -- Indent code of embedded modules for nice output.
-
-    Indenting is not safe for code! If source code has multi-line strings
-    then spaces will be added to them.
-
-    So if you can test/review result code -- use this option.
-
--- Martin, 2026-04
+-- Martin, 2026-06
 ```
 
 
@@ -52,8 +45,7 @@ It is a file scanner. It gets all `*.lua` files from given `<modules_dir>`
 directory (and subdirectories), converts their file names to module names
 and loads their contents (source code).
 
-Then it prints code to fill global `package.preload` table (see Lua documentation)
-with entries like
+Then it prints code to fill global `package.preload` table with entries like
 
 ```
 _G.package.preload[<module_name>] =
@@ -62,39 +54,7 @@ _G.package.preload[<module_name>] =
   end
 ```
 
-Module's code is not indented by default. Produced result is safe but ugly.
-
-If `--indent` option is provided then... well then module's code is indented.
-It will produce nice foldable output but it's not safe for code.
-
-If code contains multi-line strings like
-
-```Lua
-print([[
-Hello there!
-
-Multi-line strings in Lua are so cool and hard to capture!
-
-]])
-```
-
-then indentation spaces will change contents of string constant.
-
-So use it if you can test or review result code. (Or just sure there are
-no multi-line strings. Or really want to.)
-
-And finally it prints activation line, which is a mere `require(<module_name>)`.
-
-`<module_name>` is command-line argument `<root_module_name>`.
-
-
-Credits:
-
-  * Idea to embed source just as `function(...)` was shared by `mjmouse9999`
-    at Lua [maillist][maillist_msg] 2026-04-24
-  * Lua authors for ["preload" concept][preload_doc]
-
-Sapienti sat.
+And finally it prints activation line, which is a mere `require(<root_module_name>)`.
 
 
 ## Requirements
@@ -106,43 +66,52 @@ Sapienti sat.
 
 ## Install/remove
 
-  Clone repo.
+  * Save file `meld` from [`bin/`][bin]
+  * Place it where you like (I'm placing to `~/bin/`)
 
-  As usual all needed guts from [`workshop`][workshop] are included.
+
+## Modify
+
+  * Clone repo
+  * Modify files in [`src/`][src]
 
 
-## Additional stuff
+## Rebuild
 
-  * There is compiled binary in [`bin/`][bin]
+  * Clone [`workshop`][workshop] repo
+  * Checkout it to date near `2026-06-16`
+  * Modify `package.path` in [`build/create_deploy.lua`][create_deploy]
+    so it can find your cloned `workshop` repo
+  * Run [`build/rebuild.sh`][rebuild]
 
-    That's melded code of this tool compiled by `luac` (v5.3) and
-    shebang line `#!/usr/local/bin/lua`.
 
-    Practically it means that if you have Lua 5.3 (and under Linux)
-    you can save this file to your `~/bin` and use it as `meld` command.
+## Credits
 
-  * There are build scripts in [`build/`][build]
-
-    They are used to generate compiled binary.
-
-    You can use them too but you'll need clone of [`workshop`][workshop]
-    repo reachable via `package.path` in `build/create_deploy.lua`.
-    In case of compatibility problems rollback repo near current date,
-    2026-06-04.
+  * Idea to embed source just as `function(...)` was shared by `mjmouse9999`
+    at Lua [maillist][maillist_msg] 2026-04-24
+  * Lua authors for "preload" concept
 
 
 ## See also
 
-* [`workshop`][workshop] -- My personal Lua framework on which this tool is based
-* [My other repositories][contents]
+  * [`package.preload`][preload_doc] documentation
+  * [Files lister][FilesLister] module
+  * [`workshop`][workshop] -- My personal Lua framework on which this tool is based
+  * [My other projects][contents]
+
 
 [DeepWiki_Logo]: https://deepwiki.com/badge.svg
 [DeepWiki_Repo]: https://deepwiki.com/martin-eden/lua_code_melder
 
-[maillist_msg]: https://groups.google.com/g/lua-l/c/AuXFlvZr42M/m/dwO9Aob1AAAJ
-[preload_doc]: https://lua.org/manual/5.5/manual.html#pdf-package.preload
-
 [bin]: bin/
+[src]: src/
 [build]: build/
+[create_deploy]: build/create_deploy.lua
+[rebuild]: build/rebuild.sh
+
+[maillist_msg]: https://groups.google.com/g/lua-l/c/AuXFlvZr42M/m/dwO9Aob1AAAJ
+
+[preload_doc]: https://lua.org/manual/5.5/manual.html#pdf-package.preload
+[FilesLister]: src/workshop/concepts/FilesLister/
 [workshop]: https://github.com/martin-eden/workshop
 [contents]: https://github.com/martin-eden/contents
