@@ -2,7 +2,7 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-06-16
+  Last mod.: 2026-06-20
 ]]
 
 --[[ Develop
@@ -136,7 +136,7 @@ local add_module_registration =
 
 local add_module_call =
   function(module_name)
-    emit("require('" ..module_name .. "')")
+    emit("return require('" ..module_name .. "')")
   end
 
 local meld =
@@ -174,4 +174,5 @@ end
   2026-04 # # #
   2026-06-04
   2026-06-16
+  2026-06-20
 ]]
