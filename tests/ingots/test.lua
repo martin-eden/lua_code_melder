@@ -30,4 +30,4 @@ return
 end
 -- ) ( module modules.a.Represent )
 
-require('test')
+return require('test')
