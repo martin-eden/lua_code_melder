@@ -92,7 +92,7 @@ Parameters
       end
     local add_module_call =
       function(module_name)
-        emit("require('" .. module_name .. "')")
+        emit("return require('" .. module_name .. "')")
       end
     local meld =
       function(modules_dir, root_module)
@@ -266,7 +266,7 @@ _G.package.preload['workshop.system.get_program_output_lines'] =
     local get_program_output_lines =
       function(shell_cmd)
         assert_string(shell_cmd)
-        local ExecResult = shell_execute(shell_cmd)
+        local is_ok, ExecResult = shell_execute(shell_cmd)
         return lines_from_str(ExecResult.output)
       end
     return get_program_output_lines
@@ -848,7 +848,8 @@ _G.package.preload['workshop.concepts.shell.execute'] =
         Result.error = file_to_str(error_filename)
         os.remove(output_filename)
         os.remove(error_filename)
-        return Result
+        local is_ok = (Result.result_code == 0)
+        return is_ok, Result
       end
     return execute_shell_command
   end
@@ -1081,4 +1082,4 @@ _G.package.preload['workshop.concepts.path_name.add_dir_postfix'] =
       end
     return add_dir_postfix
   end
-require('meld')
+return require('meld')
