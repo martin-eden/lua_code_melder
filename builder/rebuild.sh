@@ -4,46 +4,54 @@
 
 #
 # Author: Martin Eden
-# Last mod.: 2026-06-16
+# Last mod.: 2026-08-13
 #
 
 #
-# Results are placed in "bin/"
+# Results are placed in "deploy/"
 #
 # We will create executable shell file "meld" there.
-# It's plain Lua code, shebang line and "executable" attribute.
+# It's shebang line and plain Lua code.
 #
 # Toolchain uses my "lua code formatter" tool to strip comments.
 #
 #   https://github.com/martin-eden/lua_code_formatter
 #
 
-set -eu
+set -e -u
+
+#
+# src/
+#
 
 cd ../src
 
-rm -rf workshop/
+rm -r -f workshop/
 
 lua ../builder/create_deploy.lua
 
-bash deploy.sh
-rm deploy.sh
-
 mv deploy/workshop/ .
-rm -rf deploy/
+rm -r -f deploy/
 
 # Combine all Lua code
-lua meld.lua . meld > ../bin/meld.melded.lua
+lua meld.lua . meld > ../deploy/meld.melded.lua
 
-cd ../bin
+#
+# deploy/
+#
+
+cd ../deploy
 
 # Use Lua code formatter to remove comments and indent code
-reformat_lua meld.melded.lua meld.melded.stripped.lua --~keep-comments
+reformat_lua \
+  meld.melded.lua \
+  meld.melded.stripped.lua \
+  --~keep-comments \
+  --right-margin=72
 rm meld.melded.lua
 
 # Add shebang to compiled code
-shebang='#!/usr/local/bin/lua'"\n"
-echo "$shebang" > meld.melded.stripped.shebanged.lua
+echo '#!/usr/local/bin/lua'"\n" > meld.melded.stripped.shebanged.lua
 cat meld.melded.stripped.lua >> meld.melded.stripped.shebanged.lua
 rm meld.melded.stripped.lua
 
