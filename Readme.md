@@ -103,7 +103,6 @@ And finally it prints activation line, which is a mere `return require(<root_mod
 ## See also
 
   * [`package.preload`][preload_doc] documentation
-  * [Files lister][FilesLister] module
   * [`workshop`][workshop] -- My personal Lua framework on which this tool is based
   * [My other projects][contents]
 
@@ -123,6 +122,5 @@ And finally it prints activation line, which is a mere `return require(<root_mod
 [maillist_msg]: https://groups.google.com/g/lua-l/c/AuXFlvZr42M/m/dwO9Aob1AAAJ
 
 [preload_doc]: https://lua.org/manual/5.5/manual.html#pdf-package.preload
-[FilesLister]: src/workshop/concepts/FilesLister/
 [workshop]: https://github.com/martin-eden/workshop
 [contents]: https://github.com/martin-eden/contents
