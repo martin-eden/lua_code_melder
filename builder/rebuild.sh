@@ -24,7 +24,7 @@ cd ../src
 
 rm -rf workshop/
 
-lua ../build/create_deploy.lua
+lua ../builder/create_deploy.lua
 
 bash deploy.sh
 rm deploy.sh
