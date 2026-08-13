@@ -1,4 +1,4 @@
--- Aggregate Lua source files in current directory to one
+-- Aggregate Lua source files in current directory into one
 
 --[[
   Author: Martin Eden
@@ -123,14 +123,20 @@ local add_module_registration =
   function(module_name, module_code)
     local quoted_module_name = lua_quote_string(module_name)
 
-    local module_id = '( module ' .. module_name .. ' )'
+    local prefix_cmt
+    local postfix_cmt
+    do
+      local module_id = '( module ' .. module_name .. ' )'
+      prefix_cmt = '-- ( ' .. module_id
+      postfix_cmt = '-- )'
+    end
 
-    emit('-- ( ' .. module_id)
-    emit('_G.package.preload[' .. quoted_module_name .. '] =')
+    emit(prefix_cmt)
+    emit('package.preload[' .. quoted_module_name .. '] =')
     emit('function(...)')
     emit(module_code)
     emit('end')
-    emit('-- ) ' .. module_id)
+    emit(postfix_cmt)
     emit('')
   end
 
@@ -170,9 +176,7 @@ do
 end
 
 --[[
-  2024-11-20
-  2026-04 # # #
-  2026-06-04
-  2026-06-16
-  2026-06-20
+  2024 #
+  2026 # # # # # #
+  2026-08-13
 ]]
