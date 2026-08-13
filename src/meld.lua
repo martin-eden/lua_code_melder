@@ -2,7 +2,7 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-06-20
+  Last mod.: 2026-08-13
 ]]
 
 --[[ Develop
@@ -39,7 +39,7 @@ Parameters
 ]]
 
 -- Imports:
-local add_dir_postfix = request('!.concepts.path_name.add_dir_postfix')
+local add_separator = request('!.concepts.path_name.add_separator')
 local FilesLister = request('!.concepts.FilesLister.Interface')
 local file_to_str = request('!.convert.file_to_str')
 local add_to_list = request('!.concepts.list.add_item')
@@ -170,7 +170,7 @@ do
     return
   end
 
-  modules_dir = add_dir_postfix(modules_dir)
+  modules_dir = add_separator(modules_dir)
 
   meld(modules_dir, root_module)
 end

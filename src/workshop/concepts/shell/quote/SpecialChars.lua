@@ -2,52 +2,46 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-06-12
+  Last mod.: 2026-08-13
 ]]
 
--- Imports:
-local SpaceChars = request('SpaceChars')
-local add_list = request('!.concepts.list.add_list')
+local SpecialChars
+do
+  local Ascii = request('!.concepts.Ascii.Chars')
+  local SpaceChars = request('SpaceChars')
+  local add_list = request('!.concepts.list.add_list')
 
-local SpecialChars =
-  {
-    -- '!',
-    '"',
-    -- '#',
-    '$',
-    -- '%',
-    '&',
-    "'",
-    '(',
-    ')',
-    '*',
-    -- '+',
-    -- ',',
-    -- '-',
-    -- '.',
-    -- '/',
-    -- ':',
-    ';',
-    '<',
-    -- '=',
-    '>',
-    -- '?',
-    -- '@',
-    '[',
-    [[\]],
-    ']',
-    '^',
-    -- '_',
-    '`',
-    '{',
-    '|',
-    '}',
-    -- '~',
-  }
+  SpecialChars =
+    {
+      Ascii.single_quote,
+      Ascii.double_quote,
+      Ascii.dollar_sign,
+      Ascii.ampersand,
+      Ascii.asterisk,
+      Ascii.semicolon,
+      Ascii.backslash,
+      Ascii.caret,
+      Ascii.backtick,
+      Ascii.pipe,
+      Ascii.less_than,
+      Ascii.greater_than,
+      Ascii.opening_paren,
+      Ascii.closing_paren,
+      Ascii.opening_bracket,
+      Ascii.closing_bracket,
+      Ascii.opening_brace,
+      Ascii.closing_brace,
+    }
 
-add_list(SpecialChars, SpaceChars)
+  --[[
+    Punctuation chars that are not considered special in this scope:
 
--- Export:
+      ! # % + - . , / : = ? @ _ ~
+  ]]
+
+  add_list(SpecialChars, SpaceChars)
+end
+
 return SpecialChars
 
 --[[

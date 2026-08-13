@@ -2,98 +2,93 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-06-12
+  Last mod.: 2026-08-10
 ]]
 
 --[[
   Contract
 
-  * Empty pathname string is not accepted
-  * Returned list always contains at least two items
-  * If pathname is absolute then first item is ""
-  * If pathname is directory then last item is ""
+  Input is a non-empty POSIX pathname string.
+
+  Output is a list of name segments, built from these rules:
+
+    * Segments equal to "" or "." are dropped, except that a
+      trailing "" is kept when the pathname denotes a directory,
+      and a leading "" is kept when the pathname is absolute.
+
+    * If, after dropping "" and ".", no name segments remain and
+      the pathname is not absolute, the single segment "." is used
+      (this is how "." and "./" are represented).
+
+    * If the pathname is absolute, first list item is "".
+
+    * If the pathname is a directory (ends in "/", ".", or ".."),
+      last list item is "".
+
+  List length is at least one. It equals one only for a plain
+  relative name with no path separators, like "a".
 ]]
 
 -- Imports:
+local Syntels = request('Syntels')
 local split_string = request('!.string.split')
+local check_is_absolute = request('is_absolute')
+local check_is_directory = request('is_directory')
+local add_to_list = request('!.concepts.list.add_item')
+local add_list = request('!.concepts.list.add_list')
 
-local sep = '/'
-local empty = ''
-local self_dir = '.'
-local upper_dir = '..'
+local empty = Syntels.empty
+local self_dir = Syntels.self_dir
 
---[[
-  Parses string with Unix pathname. Returns table
-]]
 local pathname_from_str =
   function(path_name)
     assert_string(path_name)
-    assert(path_name ~= '', 'Please pass not empty path_name')
 
-    path_name = path_name .. sep
-    local Path = split_string(path_name, sep)
+    if (path_name == empty) then
+      error('Empty pathname.')
+    end
+
+    local is_absolute
+    local is_directory
+    local Names = { }
 
     do
-      local index = 2
-      local current_item
-      while (index <= #Path - 1) do
-        current_item = Path[index]
-        if
-          (current_item == empty) or
-          (current_item == self_dir)
-        then
-          table.remove(Path, index)
-        else
-          index = index + 1
+      local upper_dir = Syntels.upper_dir
+      local Segments
+      do
+        local sep = Syntels.separator
+        Segments = split_string(path_name .. sep, sep)
+      end
+
+      is_absolute = check_is_absolute(Segments)
+      is_directory = check_is_directory(Segments)
+
+      for _, segment in ipairs(Segments) do
+        if (segment ~= empty) and (segment ~= self_dir) then
+          add_to_list(Names, segment)
         end
       end
     end
 
-    setmetatable(
-      Path,
-      {
-        __index =
-          function(table, key)
-            if (key == 'first_node') then
-              return table[1]
-            elseif (key == 'last_node') then
-              return table[#table]
-            end
-          end,
-      }
-    )
-
-    if (Path.first_node == self_dir) and (#Path >= 3) then
-      table.remove(Path, 1)
+    if (#Names == 0) and not is_absolute then
+      add_to_list(Names, self_dir)
     end
 
-    if (Path.last_node == self_dir) and (#Path >= 2) then
-      Path[#Path] = ''
+    do
+      local Result = { }
+
+      if is_absolute then
+        add_to_list(Result, empty)
+      end
+
+      add_list(Result, Names)
+
+      if is_directory then
+        add_to_list(Result, empty)
+      end
+
+      return Result
     end
-
-    local is_directory =
-      (Path.last_node == self_dir) or
-      (Path.last_node == upper_dir) or
-      (Path.last_node == empty)
-
-    if
-      is_directory and
-      (
-        (Path.last_node ~= empty) or
-        (#Path == 1)
-      )
-    then
-      table.insert(Path, '')
-    end
-
-    --[[
-      Now <Path> contains at least two entries
-
-      If first entry is "" then it's absolute path.
-      If last entry is "" then it's directory.
-    ]]
-
-    return Path
   end
 
 -- Export:
@@ -117,47 +112,33 @@ return pathname_from_str
       It does not interpret "a/b/.." as "a/" because "b" may be
       symlink to another directory.
 
-  Examples
+  Examples (Itness format):
 
-    a
-      { 'a' }
+    '' -> error
 
-    a/
-      { 'a', '' }
+    / -> ( [] [] )
+    /. -> ditto
 
-    /a
-      { '', 'a' }
+    . -> ( . [] )
+    ./ -> ditto
 
-    /a/
-      { '', 'a', '' }
+    .. -> ( .. [] )
+    ../ -> ditto
+    ./.. -> ditto
 
-    a/b
-      { 'a', 'b' }
+    a -> ( a )
 
-    /
-      { '', '' }
+    /a -> ( [] a )
 
-    /.
-      Same as for "/"
+    a/ -> ( a [] )
 
-    .
-      { '.', '' }
+    /a/ -> ( [] a [] )
 
-    ./
-      Same as for "."
+    a/b -> ( a b )
 
-    ..
-      { '..', '' }
+    /.. -> ( [] .. [] )
 
-    ../
-    ./..
-      Same as for ".."
-
-    /..
-      { '', '..', '' }
-
-    ././..//a/./.
-      { '..', 'a', '' }
+    ././..//a/./. -> ( .. a [] )
 ]]
 
 --[[
@@ -166,4 +147,5 @@ return pathname_from_str
   2026-04 # # # #
   2026-06-11
   2026-06-12
+  2026-08-08
 ]]
