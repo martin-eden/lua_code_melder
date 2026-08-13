@@ -2,9 +2,9 @@
 
 ## What
 
-| Created | Updated |  Size   | License |
-|:-------:|:-------:|:-------:|:-------:|
-| 2024-11 | 2026-06 | < 40 K  |  LGPL3  |
+| Created |  Updated   |  Size  | License |
+|:-------:|:----------:|:------:|:-------:|
+| 2024-11 | 2026-08-13 | < 50 K |  LGPL3  |
 
 Command-line tool to aggregate all `*.lua` files in given directory
 and subdirectories into one.
@@ -48,7 +48,7 @@ and loads their contents (source code).
 Then it prints code to fill global `package.preload` table with entries like
 
 ```
-_G.package.preload[<module_name>] =
+package.preload[<module_name>] =
 function(...)
 <module_code>
 end
@@ -56,6 +56,14 @@ end
 
 And finally it prints activation line, which is a mere `return require(<root_module_name>)`.
 
+
+## Shipment
+
+  * Combined code in [`deploy/`][deploy]
+  * Full source code in [`src/`][src]
+  * Build script and tools in [`builder/`][builder]
+  * Sample input in [`tests/test_case/`][sample_input]
+  * Sample output in [`tests/ingots/`][sample_output]
 
 ## Requirements
 
@@ -66,7 +74,7 @@ And finally it prints activation line, which is a mere `return require(<root_mod
 
 ## Install/remove
 
-  * Save file `meld` from [`bin/`][bin]
+  * Save file `meld` from [`deploy/`][deploy]
   * Place it where you like (I'm placing to `~/bin/`)
 
 
@@ -79,10 +87,10 @@ And finally it prints activation line, which is a mere `return require(<root_mod
 ## Rebuild
 
   * Clone [`workshop`][workshop] repo
-  * Checkout it to date near `2026-06-16`
-  * Modify `package.path` in [`build/create_deploy.lua`][create_deploy]
+  * Checkout it to date near `Updated` date from "stats plate" in header
+  * Modify `package.path` in [`builder/create_deploy.lua`][create_deploy]
     so it can find your cloned `workshop` repo
-  * Run [`build/rebuild.sh`][rebuild]
+  * Run [`builder/rebuild.sh`][rebuild]
 
 
 ## Credits
@@ -103,11 +111,14 @@ And finally it prints activation line, which is a mere `return require(<root_mod
 [DeepWiki_Logo]: https://deepwiki.com/badge.svg
 [DeepWiki_Repo]: https://deepwiki.com/martin-eden/lua_code_melder
 
-[bin]: bin/
+[deploy]: deploy/
 [src]: src/
-[build]: build/
-[create_deploy]: build/create_deploy.lua
-[rebuild]: build/rebuild.sh
+[builder]: builder/
+[sample_input]: tests/test_case/
+[sample_output]: tests/ingots/
+
+[create_deploy]: builder/create_deploy.lua
+[rebuild]: builder/rebuild.sh
 
 [maillist_msg]: https://groups.google.com/g/lua-l/c/AuXFlvZr42M/m/dwO9Aob1AAAJ
 
