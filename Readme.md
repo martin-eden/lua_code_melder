@@ -4,7 +4,7 @@
 
 | Created |  Updated   |  Size  | License |
 |:-------:|:----------:|:------:|:-------:|
-| 2024-11 | 2026-08-13 | < 50 K |  LGPL3  |
+| 2024-11 | 2026-08-14 | < 50 K |  LGPL3  |
 
 Command-line tool to aggregate all `*.lua` files in given directory
 and subdirectories into one.
@@ -14,6 +14,7 @@ Compiles multi-file Lua program into one file.
 
 ## Usage
 
+Program prints usage help when called without arguments:
 ```
 Merge all .lua files under given directory into one executable
 code block and print it.
@@ -33,7 +34,7 @@ Parameters
   <root_module_name> -- Name of the "main" module which is called
     in generated code block.
 
--- Martin, 2026-06
+-- Martin, 2026-08
 ```
 
 
