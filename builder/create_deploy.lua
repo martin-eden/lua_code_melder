@@ -2,7 +2,7 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-08-13
+  Last mod.: 2026-08-14
 ]]
 
 --[[
@@ -32,10 +32,27 @@ local ModulesList =
     'meld',
   }
 
+--[[
+  It's tricky here
+
+  "meld" in ModulesList means that we will require() this module.
+  And it means we just execute it's code. And then process
+  internal table with module dependencies.
+
+  "meld" id command-line tool, without arguments it just prints
+  usage text. It does not load modules required for work.
+
+  So we'll call it with some dummy load to get those modules.
+]]
+
+arg[1] = '.'
+arg[2] = 'meld'
+
 deploy(ModulesList)
 
 --[[
   202?
   2026 # # #
   2026-08-13
+  2026-08-14
 ]]
