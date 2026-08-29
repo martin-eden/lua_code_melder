@@ -2,27 +2,24 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-08-12
+  Last mod.: 2026-09-23
 ]]
 
--- Imports:
 local get_cmd_listfiles = request('!.mechs.cmdline.get_cmd_listfiles')
 local get_command_output_lines = request('!.system.get_command_output_lines')
+local to_clean_filelist = request('to_clean_filelist')
 
---[[
-  Return file names in base directory as list of strings
-
-  Each entry will contain base directory prefix.
-]]
-local get_files_list =
+return
   function(base_dir)
-    return get_command_output_lines(get_cmd_listfiles(base_dir))
+    return
+      to_clean_filelist(
+        get_command_output_lines(get_cmd_listfiles(base_dir)),
+        base_dir
+      )
   end
-
--- Export:
-return get_files_list
 
 --[[
   2018 #
   2026 #
+  2026-09-23
 ]]
