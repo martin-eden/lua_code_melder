@@ -2,7 +2,7 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-08-14
+  Last mod.: 2026-09-23
 ]]
 
 --[[ Develop
@@ -19,81 +19,59 @@ require('workshop.base')
     * Gets it's contents
     * Adds to Result table: { module_name, file_contents }
 ]]
-local get_modules_root
+local get_modules
 do
-  local FilesLister = request('!.concepts.FilesLister')
-  local Result
-  local add_separator = request('!.concepts.path_name.add_separator')
-  local get_modules
+  local is_lua_file
+  local get_module_name
   do
-    local is_lua_file
-    local get_module_name
+    local lua_extension = '.lua'
+    local str_ends_with = request('!.string.ends_with')
+    is_lua_file =
+      function(file_name)
+        return str_ends_with(file_name, lua_extension)
+      end
     do
-      local lua_extension = '.lua'
-      do
-        local string_ends_with = request('!.string.ends_with')
-        is_lua_file =
-          function(file_name)
-            return string_ends_with(file_name, lua_extension)
-          end
-      end
-      do
-        local module_name_capture
-        do
-          local quote_regexp = request('!.lua.regexp.quote')
-          -- Module name is file name without ".lua" at end
-          module_name_capture = '(.*)' .. quote_regexp(lua_extension) .. '$'
+      local parse_pathname = request('!.concepts.path_name.pathname_from_str')
+      local str_remove_prefix = request('!.string.remove_prefix')
+      local str_remove_postfix = request('!.string.remove_postfix')
+      local rebase_pathname = request('!.concepts.path_name.rebase_to')
+      local module_name_delimiter = '.'
+      local list_to_str = request('!.concepts.list.to_string')
+
+      -- Convert path name to Lua's require() module name
+      get_module_name =
+        function(path_name, base_dir)
+          path_name = str_remove_prefix(path_name, base_dir)
+          path_name = str_remove_postfix(path_name, lua_extension)
+          path_name = rebase_pathname('./', path_name)
+
+          return
+            list_to_str(parse_pathname(path_name), module_name_delimiter)
         end
-        local str_match = string.match
-        -- Convert file name (without dir) to Lua's require() module name
-        get_module_name =
-          function(file_name)
-            return str_match(file_name, module_name_capture)
-          end
-      end
     end
-    local file_to_str = request('!.convert.file_to_str')
-    local add_to_list = request('!.concepts.list.add_item')
-    local pathname_sep
-    do
-      local PathEls = request('!.concepts.path_name.Syntels')
-      pathname_sep = PathEls.separator
-    end
-    local module_name_sep = '.'
-    get_modules =
-      function(base_dir_name, module_name_prefix)
-        FilesLister:SetBaseDirectory(base_dir_name)
-
-        local Files = FilesLister:GetFiles()
-
-        for _, file_name in ipairs(Files) do
-          if not is_lua_file(file_name) then goto next end
-
-          local module_name = module_name_prefix .. get_module_name(file_name)
-          local module_code = file_to_str(base_dir_name .. file_name)
-
-          add_to_list(Result, { module_name, module_code })
-
-          :: next ::
-        end
-
-        local Directories = FilesLister:GetDirectories()
-
-        for _, subdir_name in ipairs(Directories) do
-          get_modules(
-            base_dir_name .. subdir_name .. pathname_sep,
-            module_name_prefix .. subdir_name .. module_name_sep
-          )
-        end
-      end
   end
+  local file_to_str = request('!.convert.file_to_str')
+  local add_to_list = request('!.concepts.list.add_item')
 
-  get_modules_root =
-    function(start_dir)
-      FilesLister = FilesLister.create()
-      Result = { }
+  local get_files_list =
+    request('!.file_system.directory.get_total_files_list')
 
-      get_modules(add_separator(start_dir), '')
+  get_modules =
+    function(base_dir)
+      local Files = get_files_list(base_dir)
+
+      local Result = { }
+
+      for _, path_name in ipairs(Files) do
+        if not is_lua_file(path_name) then goto next end
+
+        local module_name = get_module_name(path_name, base_dir)
+        local module_code = file_to_str(path_name)
+
+        add_to_list(Result, { module_name, module_code })
+
+        :: next ::
+      end
 
       return Result
     end
@@ -154,20 +132,12 @@ Parameters
           function(module_name, module_code)
             local quoted_module_name = lua_quote_string(module_name)
 
-            local prefix_cmt
-            local postfix_cmt
-            do
-              local module_id = '( module ' .. module_name .. ' )'
-              prefix_cmt = '-- ( ' .. module_id
-              postfix_cmt = '-- )'
-            end
-
-            emit(prefix_cmt)
+            emit('-- ( module ' .. module_name)
             emit('package.preload[' .. quoted_module_name .. '] =')
             emit('function(...)')
             emit(module_code)
             emit('end')
-            emit(postfix_cmt)
+            emit('-- )')
             emit('')
           end
       end
@@ -178,7 +148,7 @@ Parameters
     end
     meld =
       function(modules_dir, root_module)
-        local Modules = get_modules_root(modules_dir)
+        local Modules = get_modules(modules_dir)
 
         for _, Rec in ipairs(Modules) do
           local module_name = Rec[1]
