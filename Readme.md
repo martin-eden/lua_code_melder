@@ -2,14 +2,55 @@
 
 ## What
 
-| Created |  Updated   |  Size  | License |
-|:-------:|:----------:|:------:|:-------:|
-| 2024-11 | 2026-08-14 | < 50 K |  LGPL3  |
+<table>
+  <tr>
+    <th colspan=3>Lua code melder</th>
+  </tr>
+  <tr>
+    <td>
+      <table>
+        <tr>
+          <th>Updated</th>
+          <td>2026-09-23</td>
+        </tr>
+        <tr>
+          <th>Created</th>
+          <td>2024-11</td>
+        </tr>
+        <tr>
+          <th>Code size</th>
+          <td>&lt; 50 K</td>
+        </tr>
+        <tr>
+          <th>License</th>
+          <td>LGPL3</td>
+        </tr>
+      </table>
+    </td>
+    <td align=center>
+      Compiles multi-file Lua program into one file
+    </td>
+    <td>
+      <table>
+        <tr>
+          <th>Input</th>
+          <th>Output</th>
+        </tr>
+        <tr>
+          <td>
+            <code>*.lua</code>
+          </td>
+          <td>
+            <code>.lua</code>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
 
 Command-line tool to aggregate all `*.lua` files in given directory
 and subdirectories into one.
-
-Compiles multi-file Lua program into one file.
 
 
 ## Usage
@@ -68,7 +109,7 @@ And finally it prints activation line, which is a mere `return require(<root_mod
 
 ## Requirements
 
-  * Lua 5.3 (or 5.4, 5.5)
+  * Lua 5.5 (5.4, 5.3)
   * Linux file system
   * Commands (`sh`, `find`)
 
