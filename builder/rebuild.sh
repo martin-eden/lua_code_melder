@@ -43,10 +43,9 @@ lua meld.lua . meld > ../deploy/meld.melded.lua
 cd ../deploy
 
 # Use Lua code formatter to remove comments and indent code
-reformat_lua \
+../builder/reformat_lua \
   meld.melded.lua \
   meld.melded.stripped.lua \
-  --~keep-comments \
   --right-margin=72
 rm meld.melded.lua
 
