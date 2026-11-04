@@ -4,7 +4,7 @@
 
 #
 # Author: Martin Eden
-# Last mod.: 2026-08-14
+# Last mod.: 2026-11-04
 #
 
 #
@@ -28,7 +28,7 @@ cd ../src
 
 rm -r -f workshop/
 
-lua ../builder/create_deploy.lua > /dev/null
+lua ../builder/deploy.lua > /dev/null
 
 mv deploy/workshop/ .
 rm -r -f deploy/
