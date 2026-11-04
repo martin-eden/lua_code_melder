@@ -2,7 +2,7 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-08-14
+  Last mod.: 2026-11-04
 ]]
 
 --[[
@@ -12,47 +12,46 @@
 
   * Do one of
 
-    * Call this file from root Lua source directory:
-        $ lua ../builder/create_deploy.lua
-
     * Copy this file to root Lua source directory
+
+    * Call this file from Lua source directory:
+
+        $ lua ../builder/create_deploy.lua
 
   Make sure that main Lua file executes without errors when
   loaded as module. If needed, make changes to it to behave so.
 ]]
 
+--
+local Modules = { 'meld' }
+--
 package.path = package.path .. ';../../../?.lua'
+--
+local ModulePaths, Deps
+do
+  arg[1] = '.'
+  arg[2] = 'meld'
+  local observe_modules = require('workshop.system.observe_modules')
+  ModulePaths, Deps = observe_modules(Modules)
+end
+--
 require('workshop.base')
+
+local FilesList
+do
+  local add_to = request('!.concepts.list.add_item')
+  FilesList = { }
+  for _, ModuleLoc in ipairs(ModulePaths) do
+    add_to(FilesList, ModuleLoc[2])
+  end
+end
 
 local deploy = request('!.mechs.deploy')
 
-local ModulesList =
-  {
-    'workshop.base',
-    'meld',
-  }
-
---[[
-  It's tricky here
-
-  "meld" in ModulesList means that we will require() this module.
-  And it means we just execute it's code. And then process
-  internal table with module dependencies.
-
-  "meld" id command-line tool, without arguments it just prints
-  usage text. It does not load modules required for work.
-
-  So we'll call it with some dummy load to get those modules.
-]]
-
-arg[1] = '.'
-arg[2] = 'meld'
-
-deploy(ModulesList)
+deploy(FilesList)
+--
 
 --[[
   202?
-  2026 # # #
-  2026-08-13
-  2026-08-14
+  2026 # # # # #
 ]]
