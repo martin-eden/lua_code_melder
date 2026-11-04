@@ -16,7 +16,7 @@
 
     * Call this file from Lua source directory:
 
-        $ lua ../builder/create_deploy.lua
+        $ lua ../builder/deploy.lua
 
   Make sure that main Lua file executes without errors when
   loaded as module. If needed, make changes to it to behave so.
