@@ -2,7 +2,7 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-08-23
+  Last mod.: 2026-09-24
 ]]
 
 --[[
@@ -22,27 +22,11 @@
       ^. -- upper directory
       !. -- root directory
 
-  * Global "get_dependencies()"
-
-    Return table with dependencies map.
-
-    If module "a.b" request()-ed module "c.d" then
-    dependencies map will contain
-
-      {
-        ...
-        ["a.b"] = { ..., ["c.d"] = true },
-      }
-
   * Global "get_base_prefix()"
 
     Implementation of "request()" knows it's own module name prefix
     for "require()". It's critical information for niche tools.
-
-  * Global "get_require_name()"
-
-    Not essential -- can be recreated with already provided information.
-    Used by [require_file]. Shared because we don't like duplicated code.
+    Used by [require_file].
 
   * Convenience globals
 
@@ -70,212 +54,169 @@
   and use it for relative require() modules in that directory.
 ]]
 
--- External functions used by implementation
-local str_match = string.match
-local str_find = string.find
-local str_sub = string.sub
-local tbl_pack = table.pack
-local tbl_unpack = table.unpack
-local require = require
-
-local empty = ''
-
+local set_base_prefix
+local split_name
+local get_base_prefix
+local request
 local stack_init
-local stack_get
 local stack_add
 local stack_remove
 do
-  local Names
-  local depth
+  local str_match = string.match
+  local str_find = string.find
+  local str_sub = string.sub
+  local tbl_pack = table.pack
+  local tbl_unpack = table.unpack
+  local require = require
 
-  stack_init =
-    function()
-      Names = { }
-      depth = 1
-    end
+  local empty = ''
 
-  stack_get =
-    function()
-      return Names[depth]
-    end
+  local stack_get
+  do
+    local Names
+    local depth
 
-  stack_add =
-    function(prefix, name)
-      depth = depth + 1
-      Names[depth] = { prefix = prefix, name = name }
-    end
+    stack_init =
+      function()
+        Names = { }
+        depth = 1
+      end
 
-  stack_remove =
-    function()
-      depth = depth - 1
-    end
-end
+    stack_get =
+      function()
+        return Names[depth]
+      end
 
-local get_caller_prefix =
-  function()
-    local NameRec = stack_get()
+    stack_add =
+      function(prefix, name)
+        depth = depth + 1
+        Names[depth] = { prefix = prefix, name = name }
+      end
 
-    if not NameRec then return empty end
-
-    return NameRec.prefix
+    stack_remove =
+      function()
+        depth = depth - 1
+      end
   end
 
-local get_caller_name =
-  function()
-    local NameRec = stack_get()
+  local get_caller_prefix =
+    function()
+      local NameRec = stack_get()
 
-    if not NameRec then return empty end
+      if not NameRec then return empty end
 
-    return NameRec.prefix .. NameRec.name
+      return NameRec.prefix
+    end
+
+  do
+    -- a.b.c -> ( a.b. c )
+    local prefix_name_capture = '^(.+%.)([^%.]+)$'
+
+    split_name =
+      function(qualified_name)
+        local prefix, name =
+          str_match(qualified_name, prefix_name_capture)
+
+        if not prefix then
+          prefix = empty
+          if str_find(qualified_name, '%.') then
+            name = empty
+          else
+            name = qualified_name
+          end
+        end
+
+        return prefix, name
+      end
   end
 
-local split_name
-do
-  -- a.b.c -> ( a.b. c )
-  local prefix_name_capture = '^(.+%.)([^%.]+)$'
+  -- Apply relative path prefix
+  local apply_rel_prefix
+  do
+    -- a.b.c. -> a.b.
+    local uplevel_capture = '(.+%.)[^%.]-%.$'
 
-  split_name =
+    apply_rel_prefix =
+      function(base_prefix, rel_prefix)
+        while (str_sub(rel_prefix, 1, 2) == '^.') do
+          if (base_prefix == empty) then
+            error("Link is outside of caller's prefix.")
+          end
+          base_prefix = str_match(base_prefix, uplevel_capture) or empty
+          rel_prefix = str_sub(rel_prefix, 3)
+        end
+
+        return base_prefix .. rel_prefix
+      end
+  end
+
+  do
+    local base_prefix
+
+    set_base_prefix =
+      function(arg_base_prefix)
+        base_prefix = arg_base_prefix
+      end
+
+    get_base_prefix =
+      function()
+        return base_prefix
+      end
+  end
+
+  local get_require_name =
     function(qualified_name)
-      local prefix, name =
-        str_match(qualified_name, prefix_name_capture)
+      local caller_prefix
 
-      if not prefix then
-        prefix = empty
-        if str_find(qualified_name, '%.') then
-          name = empty
-        else
-          name = qualified_name
-        end
+      local is_absolute_name = (str_sub(qualified_name, 1, 2) == '!.')
+
+      if is_absolute_name then
+        qualified_name = str_sub(qualified_name, 3)
+        caller_prefix = get_base_prefix()
+      else
+        caller_prefix = get_caller_prefix()
       end
 
-      return prefix, name
+      local prefix, name = split_name(qualified_name)
+      prefix = apply_rel_prefix(caller_prefix, prefix)
+
+      return prefix .. name
+    end
+
+  request =
+    function(qualified_name)
+      local require_name = get_require_name(qualified_name)
+
+      stack_add(split_name(require_name))
+
+      local Results = tbl_pack(require(require_name))
+
+      stack_remove()
+
+      return tbl_unpack(Results)
     end
 end
 
--- Apply relative path prefix
-local apply_rel_prefix
+-- Setup and export globals
 do
-  -- a.b.c. -> a.b.
-  local uplevel_capture = '(.+%.)[^%.]-%.$'
+  -- First element is invocation module name
+  local our_require_name = (...)
 
-  apply_rel_prefix =
-    function(base_prefix, rel_prefix)
-      while (str_sub(rel_prefix, 1, 2) == '^.') do
-        if (base_prefix == empty) then
-          error("Link is outside of caller's prefix.")
-        end
-        base_prefix = str_match(base_prefix, uplevel_capture) or empty
-        rel_prefix = str_sub(rel_prefix, 3)
-      end
+  set_base_prefix(split_name(our_require_name))
 
-      return base_prefix .. rel_prefix
-    end
-end
+  _G.request = request
+  _G.get_base_prefix = get_base_prefix
 
-local set_base_prefix
-local get_base_prefix
-do
-  local base_prefix
+  -- We can now use request() but need to add our name to call stack
 
-  set_base_prefix =
-    function(arg_base_prefix)
-      base_prefix = arg_base_prefix
-    end
+  stack_init()
+  stack_add(empty, our_require_name)
 
-  get_base_prefix =
-    function()
-      return base_prefix
-    end
-end
+  request('!.system.install_is_functions')()
+  request('!.system.install_assert_functions')()
+  _G.new = request('!.table.new')
 
-local get_require_name =
-  function(qualified_name)
-    local caller_prefix
-
-    local is_absolute_name = (str_sub(qualified_name, 1, 2) == '!.')
-
-    if is_absolute_name then
-      qualified_name = str_sub(qualified_name, 3)
-      caller_prefix = get_base_prefix()
-    else
-      caller_prefix = get_caller_prefix()
-    end
-
-    local prefix, name = split_name(qualified_name)
-    prefix = apply_rel_prefix(caller_prefix, prefix)
-
-    return prefix .. name
-  end
-
-local init_dependencies
-local get_dependencies
-local add_dependency
-do
-  local Dependencies_Map
-
-  init_dependencies =
-    function()
-      Dependencies_Map = { }
-    end
-
-  get_dependencies =
-    function()
-      return Dependencies_Map
-    end
-
-  add_dependency =
-    function(src_name, dest_name)
-      Dependencies_Map[src_name] = Dependencies_Map[src_name] or { }
-
-      Dependencies_Map[src_name][dest_name] = true
-    end
-end
-
-local request =
-  function(qualified_name)
-    local require_name = get_require_name(qualified_name)
-
-    local src_name = get_caller_name()
-
-    stack_add(split_name(require_name))
-
-    local dest_name = get_caller_name()
-
-    add_dependency(src_name, dest_name)
-
-    local Results = tbl_pack(require(require_name))
-
-    stack_remove()
-
-    return tbl_unpack(Results)
-  end
-
--- Main
-do
-  -- Setup and export globals
-  if (_G.request == nil) then
-    -- First element is invocation module name
-    local our_require_name = (...)
-
-    set_base_prefix(split_name(our_require_name))
-    init_dependencies()
-
-    _G.request = request
-    _G.get_require_name = get_require_name
-    _G.get_base_prefix = get_base_prefix
-    _G.get_dependencies = get_dependencies
-
-    -- We can now use request() but need to add our name to call stack
-
-    stack_init()
-    stack_add(empty, our_require_name)
-
-    request('!.system.install_is_functions')()
-    request('!.system.install_assert_functions')()
-    _G.new = request('!.table.new')
-
-    stack_remove()
-  end
+  stack_remove()
 end
 
 --[[
@@ -283,6 +224,6 @@ end
   2017 #
   2018 # #
   2024 #
-  2026 # # #
-  2026-08-23
+  2026 # # # #
+  2026-09-24
 ]]
