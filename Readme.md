@@ -11,7 +11,7 @@
       <table>
         <tr>
           <th>Updated</th>
-          <td>2026-09-23</td>
+          <td>2026-11-16</td>
         </tr>
         <tr>
           <th>Created</th>
@@ -57,37 +57,33 @@ and subdirectories into one.
 
 Program prints usage help when called without arguments:
 ```
-Merge all .lua files under given directory into one executable
-code block and print it.
+Combine all .lua files in given directory into one Lua file.
 
 Usage
 
-  meld <modules_dir> <root_module_name>
+  meld <modules_dir> <root_module_name> <output_file>
 
 Example
 
-  $ meld test_case/ test > ingots/test.lua
+  $ meld test_case/ test ingots/test.lua
 
 Parameters
 
-  <modules_dir> -- Directory from which we search for .lua files.
+  <modules_dir> -- directory where we search for Lua files
+  <root_module_name> -- name of the "main" module to call
+  <output_file> -- output file name
 
-  <root_module_name> -- Name of the "main" module which is called
-    in generated code block.
-
--- Martin, 2026-08
+-- Martin, 2026-11
 ```
 
 
 ## How it works
 
-Melder generates Lua source code and prints it to stdout.
-
 It is a file scanner. It gets all `*.lua` files from given `<modules_dir>`
 directory (and subdirectories), converts their file names to module names
 and loads their contents (source code).
 
-Then it prints code to fill global `package.preload` table with entries like
+Then it writes code to fill global `package.preload` table with entries like
 
 ```
 package.preload[<module_name>] =
@@ -96,7 +92,7 @@ function(...)
 end
 ```
 
-And finally it prints activation line, which is a mere `return require(<root_module_name>)`.
+And finally it writes activation line, which is a mere `return require(<root_module_name>)`.
 
 
 ## Shipment
