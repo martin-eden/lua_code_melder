@@ -2,13 +2,13 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-11-04
+  Last mod.: 2026-11-16
 ]]
 
 --[[
   How to use
 
-  * Include root modules in <ModulesList>
+  * Include root modules in <modulesList>
 
   * Do one of
 
@@ -23,32 +23,33 @@
 ]]
 
 --
-local Modules = { 'meld' }
+local modules = { 'meld' }
 --
 package.path = package.path .. ';../../../?.lua'
 --
-local ModulePaths, Deps
+local module_recs
 do
   arg[1] = '.'
   arg[2] = 'meld'
+  arg[3] = '/tmp/melded.lua'
   local observe_modules = require('workshop.system.observe_modules')
-  ModulePaths, Deps = observe_modules(Modules)
+  module_recs = observe_modules(modules)
 end
 --
 require('workshop.base')
 
-local FilesList
+local filelist
 do
   local add_to = request('!.concepts.list.add_item')
-  FilesList = { }
-  for _, ModuleLoc in ipairs(ModulePaths) do
-    add_to(FilesList, ModuleLoc[2])
+  filelist = { }
+  for _, module in ipairs(module_recs) do
+    add_to(filelist, module[2])
   end
 end
 
 local deploy = request('!.mechs.deploy')
 
-deploy(FilesList)
+deploy(filelist)
 --
 
 --[[
