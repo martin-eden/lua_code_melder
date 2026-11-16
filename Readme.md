@@ -34,7 +34,7 @@
       </table>
     </td>
     <td align=center>
-      Compiles multi-file Lua program into one file
+      Combiles multi-file Lua program into one file
     </td>
     <td>
       <table>
