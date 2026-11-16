@@ -1,3 +1,3 @@
-local ModuleA = require('modules.a')
+local module_a = require('modules.a')
 
-ModuleA:Represent()
+module_a:represent()

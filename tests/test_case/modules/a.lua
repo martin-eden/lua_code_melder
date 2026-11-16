@@ -1,7 +1,7 @@
-local Represent = require('modules.a.Represent')
+local represent = require('modules.a.represent')
 
 return
   {
-    Represent = Represent,
-    Data = '[Test representation.]',
+    [1] = '[test representation]',
+    represent = represent,
   }
