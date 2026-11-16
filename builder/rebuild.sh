@@ -4,7 +4,7 @@
 
 #
 # Author: Martin Eden
-# Last mod.: 2026-11-04
+# Last mod.: 2026-11-16
 #
 
 #
@@ -34,7 +34,7 @@ mv deploy/workshop/ .
 rm -r -f deploy/
 
 # Combine all Lua code
-lua meld.lua . meld > ../deploy/meld.melded.lua
+lua meld.lua . meld ../deploy/meld.melded.lua
 
 #
 # deploy/
@@ -59,7 +59,7 @@ mv meld.melded.stripped.shebanged.lua meld
 chmod +x meld
 
 # Regenerate test output
-./meld ../tests/test_case test > ../tests/ingots/test.lua
+./meld ../tests/test_case test ../tests/ingots/test.lua
 
 # 2026-04-25
 # 2026-06-04
