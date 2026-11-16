@@ -2,22 +2,19 @@
 
 --[[
   Author: Martin Eden
-  Last mod.: 2026-09-23
+  Last mod.: 2026-11-16
 ]]
 
---[[ Develop
-package.path = package.path .. ';../../../?.lua'
---]]
 require('workshop.base')
 
 --[[
-  Files visitor
+  files visitor
 
   For each Lua file in current directory:
 
     * Gets it's name as module name (for require())
     * Gets it's contents
-    * Adds to Result table: { module_name, file_contents }
+    * Adds to result table: { module_name, file_contents }
 ]]
 local get_modules
 do
@@ -50,30 +47,22 @@ do
         end
     end
   end
-  local file_to_str = request('!.convert.file_to_str')
-  local add_to_list = request('!.concepts.list.add_item')
 
   local get_files_list =
     request('!.file_system.directory.get_total_files_list')
+  local add_to_list = request('!.concepts.list.add_item')
 
   get_modules =
     function(base_dir)
-      local Files = get_files_list(base_dir)
-
-      local Result = { }
-
-      for _, path_name in ipairs(Files) do
+      local files = get_files_list(base_dir)
+      local result = { }
+      for _, path_name in ipairs(files) do
         if not is_lua_file(path_name) then goto next end
-
         local module_name = get_module_name(path_name, base_dir)
-        local module_code = file_to_str(path_name)
-
-        add_to_list(Result, { module_name, module_code })
-
+        add_to_list(result, { module_name, path_name })
         :: next ::
       end
-
-      return Result
+      return result
     end
 end
 
@@ -81,98 +70,50 @@ end
 do
   local modules_dir = arg[1]
   local root_module = arg[2]
+  local output_file_name = arg[3]
 
   local usage_help = [[
-Merge all .lua files under given directory into one executable
-code block and print it.
+Merge all .lua files in given directory into one Lua file.
 
 Usage
 
-  meld <modules_dir> <root_module_name>
+  meld <modules_dir> <root_module_name> <output_file>
 
 Example
 
-  $ meld test_case/ test > ingots/test.lua
+  $ meld test_case/ test ingots/test.lua
 
 Parameters
 
-  <modules_dir> -- Directory from which we search for .lua files.
+  <modules_dir> -- directory where we search for Lua files
+  <root_module_name> -- name of the "main" module to call
+  <output_file> -- output file name
 
-  <root_module_name> -- Name of the "main" module which is called
-    in generated code block.
-
--- Martin, 2026-08
+-- Martin, 2026-11
 ]]
 
-  local emit
-  do
-    local newline
-    do
-      local AsciiChars = request('!.concepts.Ascii.Chars')
-      newline = AsciiChars.newline
+  local add_module_call =
+    function(module_name, output)
+      output:write("return require('" ..module_name .. "')" .. '\n')
     end
-    local string_ends_with = request('!.string.ends_with')
-    emit =
-      function(str)
-        io.write(str)
-        if not string_ends_with(str, newline) then
-          io.write(newline)
-        end
-      end
-  end
 
-  local meld
-  do
-    local add_module_registration
-    local add_module_call
-    do
-      do
-        local lua_quote_string = request('!.concepts.lua.quote_string')
-        add_module_registration =
-          function(module_name, module_code)
-            local quoted_module_name = lua_quote_string(module_name)
-
-            emit('-- ( module ' .. module_name)
-            emit('package.preload[' .. quoted_module_name .. '] =')
-            emit('function(...)')
-            emit(module_code)
-            emit('end')
-            emit('-- )')
-            emit('')
-          end
-      end
-      add_module_call =
-        function(module_name)
-          emit("return require('" ..module_name .. "')")
-        end
-    end
-    meld =
-      function(modules_dir, root_module)
-        local Modules = get_modules(modules_dir)
-
-        for _, Rec in ipairs(Modules) do
-          local module_name = Rec[1]
-          local module_code = Rec[2]
-
-          add_module_registration(module_name, module_code)
-        end
-
-        add_module_call(root_module)
-      end
-  end
-
-  if not (modules_dir and root_module) then
-    emit(usage_help)
-
+  if not (modules_dir and root_module and output_file_name) then
+    io.write(usage_help)
     return
   end
 
-  meld(modules_dir, root_module)
+  local modules = get_modules(modules_dir)
+  local output_file = request('!.concepts.streams.output.file')
+  output_file = output_file.create(output_file_name)
+  local meld = request('!.mechs.meld')
+  output_file:open()
+  meld(modules, output_file)
+  add_module_call(root_module, output_file)
+  output_file:close()
 end
 
 --[[
   2024 #
-  2026 # # # # # #
-  2026-08-13
-  2026-08-14
+  2026 # # # # # # # #
+  2026-11-16
 ]]
