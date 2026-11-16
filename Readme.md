@@ -25,6 +25,12 @@
           <th>License</th>
           <td>LGPL3</td>
         </tr>
+        <tr>
+          <th>💾</th>
+          <td>
+            <a href="deploy/meld"><code>meld</code></a>
+          </td>
+        </tr>
       </table>
     </td>
     <td align=center>
