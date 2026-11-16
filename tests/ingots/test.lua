@@ -1,31 +1,31 @@
 -- ( module test
 package.preload['test'] =
 function(...)
-local ModuleA = require('modules.a')
+local module_a = require('modules.a')
 
-ModuleA:Represent()
+module_a:represent()
 end
 -- )
 
 -- ( module modules.a
 package.preload['modules.a'] =
 function(...)
-local Represent = require('modules.a.Represent')
+local represent = require('modules.a.represent')
 
 return
   {
-    Represent = Represent,
-    Data = '[Test representation.]',
+    [1] = '[test representation]',
+    represent = represent,
   }
 end
 -- )
 
--- ( module modules.a.Represent
-package.preload['modules.a.Represent'] =
+-- ( module modules.a.represent
+package.preload['modules.a.represent'] =
 function(...)
 return
-  function(self)
-    print(self.Data)
+  function(me)
+    print(me[1])
   end
 end
 -- )
